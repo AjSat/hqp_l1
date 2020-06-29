@@ -1,0 +1,279 @@
+#Code where I specify an instantaneous tasks of different levels of priority
+#and check which of these methods work well.
+#Benchmark the computation times and the accuracy of the L1 methods against
+#the number of constraints. Benchmarking is on a linearized sytem.
+#So, it is L1 vs QP vs augmented PI (with nullspace projection)
+
+import sys
+sys.path.insert(0, "/home/ajay/Desktop/hqp_l1")
+from hqp import  hqp
+from tasho import task_prototype_rockit as tp
+from tasho import input_resolution
+from tasho import robot as rob
+import casadi as cs
+from casadi import pi, cos, sin
+from rockit import MultipleShooting, Ocp
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import time
+import matplotlib.pyplot as plt
+
+
+# import tkinter
+from pylab import *
+
+
+if __name__ == '__main__':
+
+	
+	max_joint_acc = 90*3.14159/180
+	max_joint_vel = 30*3.14159/180
+	gamma = 1.4
+
+	robot = rob.Robot('iiwa7')
+	robot.set_joint_acceleration_limits(lb = -max_joint_acc, ub = max_joint_acc)
+	robot.set_joint_velocity_limits(lb = -max_joint_vel, ub = max_joint_vel)
+	robot.set_joint_torque_limits(lb = -100, ub = 100)
+
+	#creating a second robot arm 
+	robot2 = rob.Robot('iiwa7')
+	robot2.set_joint_acceleration_limits(lb = -max_joint_acc, ub = max_joint_acc)
+	robot2.set_joint_velocity_limits(lb = -max_joint_vel, ub = max_joint_vel)
+	robot2.set_joint_torque_limits(lb = -100, ub = 100)
+
+	jac_fun_rob = robot.set_kinematic_jacobian('jac_fun', 6)
+
+	ts = 0.005
+	T = 1.000*5
+
+	q0_1 = [-5.53636820e-01, 1.86726808e-01, -1.32319806e-01, -2.06761360e+00, 3.12421835e-02,  8.89043596e-01, -7.03329152e-01]
+	q0_2 = [ 0.36148756, 0.19562711, 0.34339407,-2.06759027, -0.08427634, 0.89133467, 0.75131025]
+
+	#Implementing with my L1 norm method
+
+	hqp = hqp()
+
+	#decision variables for robot 1
+	q1, q_dot1 = hqp.create_variable(7, 1e-1)
+	J1 = jac_fun_rob(q1)
+	J1 = cs.vertcat(J1[0], J1[1])
+	#progress variable for robot 1
+	s_1, s_dot1 = hqp.create_variable(1, 1e-1)
+
+	fk_vals1 = robot.fk(q1)[6] #forward kinematics first robot
+
+	#decision variables for robot 2
+	q2, q_dot2 = hqp.create_variable(7, 1e-1)
+	J2 = jac_fun_rob(q2)
+	J2 = cs.vertcat(J2[0], J2[1])
+	#progress variables for robot 2
+	s_2, s_dot2 = hqp.create_variable(1, 1e-3)
+
+	fk_vals2 = robot.fk(q2)[6] #forward kinematics second robot
+	fk_vals2[1,3] += 0.3 #accounting for the base offset in the y-direction
+
+	print(robot.fk(q0_1)[6])
+	print(robot2.fk(q0_2)[6])
+
+	#specifying the cartesian trajectory of the two robots as a function
+	#of the progress variable
+
+	rob1_start_pose = cs.DM([0.3, -0.24, 0.4])
+	rob1_end_pose = cs.DM([0.6, 0.2, 0.25])
+	traj1 = rob1_start_pose + cs.fmin(s_1, 1)*(rob1_end_pose - rob1_start_pose)
+
+	rob2_start_pose = cs.DM([0.3, 0.54, 0.4])
+	rob2_end_pose = cs.DM([0.6, 0.1, 0.25])
+	traj2 = rob2_start_pose + cs.fmin(s_2, 1)*(rob2_end_pose - rob2_start_pose)
+
+	#Highest priority: Hard constraints on joint velocity and joint position limits
+	hqp.create_constraint(q_dot1, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
+	hqp.create_constraint(q_dot2, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
+	hqp.create_constraint(q1 + q_dot1*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
+	hqp.create_constraint(q2 + q_dot2*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
+
+	#2nd priority: Orientation constraints are fixed, And also the TODO: obstacle avoidance
+
+	# slack_priority2 = opti.variable(6, 1)
+	hqp.create_constraint(cs.vertcat(J1[3:6, :]@q_dot1, J2[3:6, :]@q_dot2), 'equality', priority = 1)
+
+	dist_ees = -cs.sqrt((fk_vals1[0:3,3] - fk_vals2[0:3, 3]).T@(fk_vals1[0:3,3] - fk_vals2[0:3, 3])) + 0.3
+	Jac_dist_con = cs.jacobian(dist_ees, cs.vertcat(q1, q2))
+	K_coll_avoid = 1
+	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2) + K_coll_avoid*dist_ees, 'ub', priority = 2, options = {'ub':0})
+
+	#3rd highest priority. Stay on the path for both the robots
+	#for robot 1
+	stay_path1 = fk_vals1[0:3, 3] - traj1
+	K_stay_path1 = 1
+	Jac_sp1 = cs.jacobian(stay_path1, cs.vertcat(q1, s_1))
+	hqp.create_constraint(Jac_sp1@cs.vertcat(q_dot1, s_dot1) + K_stay_path1*stay_path1, 'equality', priority = 2)
+
+	#for robot 2
+	stay_path2 = fk_vals2[0:3, 3] - traj2
+	K_stay_path2 = 1
+	Jac_sp2 = cs.jacobian(stay_path2, cs.vertcat(q2, s_2))
+	hqp.create_constraint(Jac_sp2@cs.vertcat(q_dot2, s_dot2) + K_stay_path2*stay_path2, 'equality', priority = 2)
+
+	#4th priority: First robot reaches the goal
+	s1_dot_rate_ff = 0.25
+	hqp.create_constraint(s_dot1 - s1_dot_rate_ff, 'equality', priority = 3)
+
+	#5th priority: Second robot reaches the goal
+	s2_dot_rate_ff = 0.5
+	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
+
+	#Adding bounds on the acceleration
+	# q_dot1_prev = opti.parameter(7, 1)
+	# opti.set_value(q_dot1_prev, cs.DM([0]*7))
+	# opti.subject_to(-max_joint_acc*ts <= (q_dot1 - q_dot1_prev <= max_joint_acc*ts))
+	# opti.minimize(objective)
+
+	# q_dot2_prev = opti.parameter(7, 1)
+	# opti.set_value(q_dot2_prev, cs.DM([0]*7))
+	# opti.subject_to(-max_joint_acc*ts <= (q_dot2 - q_dot2_prev <= max_joint_acc*ts))
+	# opti.minimize(objective)
+
+	p_opts = {"expand":True}
+
+	# # s_opts = {"max_iter": 100, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
+
+	# kkt_tol_pr = 1e-6
+	# kkt_tol_du = 1e-6
+	# min_step_size = 1e-6
+	# max_iter = 2
+	# max_iter_ls = 3
+	# qpsol_options = {'constr_viol_tol': kkt_tol_pr, 'dual_inf_tol': kkt_tol_du, 'verbose' : False, 'print_iter': False, 'print_header': False, 'dump_in': False, "error_on_fail" : False}
+	# solver_options = {'qpsol': 'qrqp', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
+	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
+
+	q_opt = cs.vertcat(cs.DM(q0_1), 0, cs.DM(q0_2), 0)
+	q_opt_history = q_opt
+	q_dot_opt = cs.DM([0]*16)
+	q_dot_opt_history = q_dot_opt
+	hqp.configure()
+
+	tic = time.time()
+
+	constraint_violations = cs.DM([0, 0, 0, 0])
+
+	#Setup for visualization
+	visualizationBullet = True
+	counter = 1
+	if visualizationBullet:
+
+		from tasho import world_simulator
+		import pybullet as p
+
+		obj = world_simulator.world_simulator()
+
+		position = [0.0, 0.0, 0.0]
+		orientation = [0.0, 0.0, 0.0, 1.0]
+
+		kukaID = obj.add_robot(position, orientation, 'iiwa7')
+		position = [0.0, 0.3, 0.0]
+		kukaID2 = obj.add_robot(position, orientation, 'iiwa7')
+
+		joint_indices = [0, 1, 2, 3, 4, 5, 6]
+		obj.resetJointState(kukaID, joint_indices, q0_1)
+		obj.resetJointState(kukaID2, joint_indices, q0_2)
+		obj.physics_ts = ts
+
+	cool_off_counter = 0
+	for i in range(math.ceil(T/ts)):
+		counter += 1
+		sol = hqp.solve_HQPl1(q_opt, q_dot_opt)
+
+		q_dot1_sol = sol.value(q_dot1)
+		q_dot2_sol = sol.value(q_dot2)
+		s_dot1_sol = sol.value(s_dot1)
+		s_dot2_sol = sol.value(s_dot2)
+
+		#Computing the constraint violations
+		con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
+		constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
+		# print(con_viols)
+		# print(q_opt)
+		# print(s2_opt)
+
+		#Update all the variables
+		q_dot_opt = cs.vertcat(q_dot1_sol, s_dot1_sol, q_dot2_sol, s_dot2_sol)
+		q_opt += ts*q_dot_opt
+
+		s1_opt = q_opt[7]
+		if s1_opt >=1:
+			print("Robot1 reached it's goal. Terminating")
+			cool_off_counter += 1
+			if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
+				break
+
+		fk_vals1_sol = sol.value(fk_vals1)
+		fk_vals2_sol = sol.value(fk_vals2)
+		print(fk_vals1_sol)
+		print(fk_vals2_sol)
+
+		if visualizationBullet:
+			obj.setController(kukaID, "velocity", joint_indices, targetVelocities = q_dot1_sol)
+			obj.setController(kukaID2, "velocity", joint_indices, targetVelocities = q_dot2_sol)
+			obj.run_simulation(1)
+
+	# 	J_sol = sol.value(J)
+
+	# 	x_dot = cs.horzcat(x_dot, cs.mtimes(J_sol, q_dot_sol))
+
+	# 	print(x_dot[:,-1])
+
+	# 	q_opt += q_dot_sol*ts
+		q_opt_history = cs.horzcat(q_opt_history, q_opt)
+		q_dot_opt_history = cs.horzcat(q_dot_opt_history, q_dot_opt)
+	# 	c1_jac_sol = sol.value(c1_jac)
+	# 	c2_jac_sol = sol.value(c2_jac)
+	# 	c3_jac_sol = sol.value(c3_jac)
+
+	# 	# print(c3_jac_sol)
+	# 	# print(cs.mtimes(c3_jac_sol, c2_jac_sol.T))
+
+
+		#When bounds on acceleration
+		# opti.set_value(q_dot1_prev, q_dot1_sol)
+		# opti.set_value(q_dot2_prev, q_dot2_sol)
+	if visualizationBullet:
+		obj.end_simulation()
+
+	time_l1opt = time.time() - tic
+
+	# # print("Nullspace Projection took " + str(time_nsp) +"s")
+	print("L1 optimization method took " + str(time_l1opt) +"s")
+
+	# # print(q_pi_history[-1])
+	# print(q_opt_history[:,-1])
+
+	#Implementing solution by Hierarchical QP
+	figure()
+	plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
+	plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
+	plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
+	plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
+	title("Constraint violations")
+	xlabel("Time step (Control sampling time = 0.005s)")
+	legend()
+
+	figure()
+	plot(list(range(counter-1)), q_dot_opt_history.full().T)
+	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# # 
+	title("Trajectory")
+	xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	ylabel('Seconds')
+	
+
+	# figure()
+	# plot(list(range(201)), x_dot[0,:].full().T, label = 'x')
+	# plot(list(range(201)), x_dot[1,:].full().T, label = 'y')
+	# plot(list(range(201)), x_dot[2,:].full().T, label = 'z')
+	# plot(list(range(201)), x_dot[3,:].full().T, label = 'w_x')
+	# plot(list(range(201)), x_dot[4,:].full().T, label = 'w_y')
+	# plot(list(range(201)), x_dot[5,:].full().T, label = 'w_z')
+	# legend()
+	show(block=True)
