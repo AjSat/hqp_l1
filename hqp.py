@@ -42,6 +42,9 @@ class hqp:
 
 		return var0, var_dot
 
+	def set_value(self, var, val):
+		self.opti.set_value(var, val)
+
 	def create_constraint(self, expression, type, priority = 0, options = {}):
 
 		opti = self.opti
@@ -55,6 +58,7 @@ class hqp:
 
 			elif type == 'lub':
 				opti.subject_to(-slack_var + options['lb'] <= (expression <= slack_var + options['ub']))
+				opti.subject_to(slack_var >= 0)
 
 			elif type == 'ub':
 				opti.subject_to(expression <= slack_var + options['ub'])
@@ -116,7 +120,7 @@ class hqp:
 
 		#compute slack gains
 		gain_least_priority = 1
-		gamma = 1e1
+		gamma = [0.25]*(self.number_priorities-1)
 		cumulative_weight = 0
 		for i in range(0,self.number_priorities):
 			priority = self.number_priorities - i
@@ -124,14 +128,14 @@ class hqp:
 			if i == 0:
 				for j in range(constraints.shape[0]):
 					weight = gain_least_priority/cs.norm_1(constraints[j, :])
-					print(weight)
+					# print(weight)
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
 			else:
-				gain = gamma*cumulative_weight
+				gain = gamma[priority-1]*cumulative_weight
 				for j in range(constraints.shape[0]):
 					weight = gain/cs.norm_1(constraints[j, :])
-					print(weight)
+					# print(weight)
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
 		print("Cumulative weight is")

@@ -276,4 +276,5 @@ if __name__ == '__main__':
 	# plot(list(range(201)), x_dot[4,:].full().T, label = 'w_y')
 	# plot(list(range(201)), x_dot[5,:].full().T, label = 'w_z')
 	# legend()
+	print(sol.value(hqp.opti.lam_g))
 	show(block=True)
