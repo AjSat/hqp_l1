@@ -14,6 +14,7 @@ import time
 import matplotlib.pyplot as plt
 # import tkinter
 from pylab import *
+import copy
 
 class hqp:
 	"""
@@ -25,10 +26,23 @@ class hqp:
 		self.slacks = {} #Slacks for the constraints
 		self.slack_weights = {} #the weights for the slack variables
 		self.constraints = {}
+		self.constraint_type = {}
+		self.constraint_options_lb = {}
+		self.constraint_options_ub = {}
 		self.variables0 = [] #Expression for the current value of the variables
-
+		self.cascadedHQP_active = False
 		self.opti = cs.Opti() #creating CasADi's optistack
 		self.obj = 0 #the variable to be minimized.
+
+	def activate_cascadedHQP(priority_levels):
+		""" Should be activated before creating any variables or adding any constraints"""
+		cHQP = []
+		for i in range(priority_levels):
+			cHQP.append(cs.Opti())
+
+		self.cascadedHQP_active = True
+
+
 
 	def create_variable(self, size, weight = 0):
 
@@ -45,7 +59,7 @@ class hqp:
 	def set_value(self, var, val):
 		self.opti.set_value(var, val)
 
-	def create_constraint(self, expression, type, priority = 0, options = {}):
+	def create_constraint(self, expression, ctype, priority = 0, options = {}):
 
 		opti = self.opti
 		if priority >= 1:
@@ -53,18 +67,18 @@ class hqp:
 			slack_var = opti.variable(shape, 1)
 			slack_weights = opti.parameter(shape, 1)
 
-			if type == 'equality':
+			if ctype == 'equality':
 				opti.subject_to(-slack_var <= (expression <= slack_var))
 
-			elif type == 'lub':
+			elif ctype == 'lub':
 				opti.subject_to(-slack_var + options['lb'] <= (expression <= slack_var + options['ub']))
 				opti.subject_to(slack_var >= 0)
 
-			elif type == 'ub':
+			elif ctype == 'ub':
 				opti.subject_to(expression <= slack_var + options['ub'])
 				opti.subject_to(slack_var >= 0)
 
-			elif type == 'lb':
+			elif ctype == 'lb':
 				opti.subject_to(-slack_var + options['lb'] <= expression)
 				opti.subject_to(slack_var >= 0)
 
@@ -74,22 +88,36 @@ class hqp:
 				self.slacks[priority] = []
 				self.slack_weights[priority] = []
 				self.constraints[priority] = []
+				self.constraint_type[priority] = []
+				self.constraint_options_lb[priority]= []
+				self.constraint_options_ub[priority] = []
 
 			self.slacks[priority] = cs.vertcat(self.slacks[priority], slack_var)
 			self.slack_weights[priority] = cs.vertcat(self.slack_weights[priority], slack_weights)
 			self.constraints[priority] = cs.vertcat(self.constraints[priority], expression)
+			self.constraint_type[priority].append((expression.shape[0], ctype))
+			if 'lb' in options:
+				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], options['lb'])
+			else:
+				print(expression.shape)
+				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], cs.DM.zeros(expression.shape[0]))
+
+			if 'ub' in options:
+				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], options['ub'])
+			else:
+				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], cs.MX([0]*expression.shape[0]))
 
 		elif priority == 0:
-			if type == 'equality':
+			if ctype == 'equality':
 				opti.subject_to(expression == 0)
 
-			elif type == 'lub':
+			elif ctype == 'lub':
 				opti.subject_to( options['lb'] <= (expression <= options['ub']))
 
-			elif type == 'ub':
+			elif ctype == 'ub':
 				opti.subject_to(expression <= options['ub'])
 
-			elif type == 'lb':
+			elif ctype == 'lb':
 				opti.subject_to(options['lb'] <= expression)
 
 			if priority not in self.constraints:
@@ -108,6 +136,7 @@ class hqp:
 			self.constraint_funs[i] = cs.Function('cons' + str(i), [self.variables0, self.variables_dot], [cs.jacobian(self.constraints[i], self.variables_dot)])
 
 		self.opti.minimize(self.obj)
+
 	def solve_cascadedQP(self):
 
 		print("Not implemented")
@@ -141,6 +170,14 @@ class hqp:
 		print("Cumulative weight is")
 		print(cumulative_weight)
 		sol = opti.solve()
+
+		
+		# opti2 = copy.deepcopy(opti)
+		# opti2.set_value(self.variables0, variable_values)
+		# p_opts = {"expand":True}
+		# s_opts = {"max_iter": 100}#, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
+		# opti2.solver('ipopt', p_opts, s_opts)
+		# opti2.solve()
 		#TODO: add something that checks the satisfaction of the hierarchy
 		return sol
 
