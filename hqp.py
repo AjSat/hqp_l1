@@ -1,6 +1,6 @@
 # Code containing all the routines for L1-HQP
 
-import sys
+import sys, os
 from tasho import task_prototype_rockit as tp
 from tasho import input_resolution
 from tasho import robot as rob
@@ -137,9 +137,67 @@ class hqp:
 
 		self.opti.minimize(self.obj)
 
-	def solve_cascadedQP(self):
+	def setup_cascadedQP(self):
+		number_priorities = len(self.slacks)
+		opti = self.opti
+		cHQP = {}
+		cHQP_slackparams = {}
+		for i in range(1, number_priorities + 1):
+			#create a separate opti instance of each priority level
+			opti2 = copy.deepcopy(opti)
+			cHQP_slackparams[i] = {}
+			# print("i is = "+ str(i))
+			for j in range(1,i):
+				#create parameters for the slack variables from the lower levels
+				# print(self.slacks[j].shape[0])
+				cHQP_slackparams[i][j] = opti2.parameter(self.slacks[j].shape[0], 1)
+				opti2.subject_to(cHQP_slackparams[i][j] == self.slacks[j])
+				# print("j is = " + str(j))
+				#Impose constraints from all lower levels
+			cHQP[i] = opti2
 
-		print("Not implemented")
+		self.cHQP = cHQP
+		self.cHQP_slackparams = cHQP_slackparams
+
+	def solve_cascadedQP(self, variable_values, variable_dot_values):
+
+		sol_cqp = {}
+		gain = 1 #just set some value for the L1 penalty on task constraints
+		number_priorities = len(self.slacks)
+		# print(self.slacks)
+		for priority in range(1, number_priorities + 1):
+			print("solving for priority level = " + str(priority))
+			opti = self.cHQP[priority] #loading the opti instance for the first priority level
+			opti.set_value(self.variables0, variable_values)
+			opti.set_initial(self.variables_dot, variable_dot_values)
+
+			#set weights for all constraints to zero
+			for j in range(1, number_priorities + 1):
+				opti.set_value(self.slack_weights[j], [0]*self.slack_weights[j].shape[0])
+			#set weights only for the constraints of this particular priority level
+			constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
+			for j in range(constraints.shape[0]):
+				weight = gain/cs.norm_1(constraints[j, :])
+				# opti.set_value(self.slack_weights[priority][j], weight)
+
+			#set the values of the slack variables of the previous priority levels
+			#with the solution from the previous QP
+			for j in range(1, priority):
+				#obtain the slack weights from the solution of the previous QP
+				sol_previous_qp = sol_cqp[priority - 1].value(self.slacks[j])
+				opti.set_value(self.cHQP_slackparams[priority][j], sol_previous_qp)
+
+			#solve the QP for this priority level
+			print(opti.p.shape)
+			print(self.opti.p.shape)
+			blockPrint()
+			sol = opti.solve()
+			enablePrint()
+			sol_cqp[priority] = sol
+
+		return sol_cqp
+			
+
 
 	def solve_HQPl1(self, variable_values, variable_dot_values):
 
@@ -182,3 +240,11 @@ class hqp:
 		return sol
 
 		print("Not implemented")
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
