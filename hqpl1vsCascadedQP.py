@@ -20,12 +20,12 @@ import copy
 
 hqp = hqp_p.hqp()
 
-n = 50
-pl = 20 #priority levels
+n = 10
+pl = 8 #priority levels
 
-n_eq_per_level = 2
-n_ineq_per_level = 3
-np.random.seed(451)
+n_eq_per_level = 1
+n_ineq_per_level = 2
+np.random.seed(8) #for 45, 1, 8 HQP-l1 does not agree with the cHQP 
 
 
 x, x_dot = hqp.create_variable(n, 1e-3)
@@ -57,29 +57,32 @@ for i in range(pl):
 	b_lower[i] = b_upper[i] - 1
 	hqp.create_constraint(A_ineq[i]@x_dot, 'lub', priority = i, options = {'lb':b_upper[i] - 10, 'ub':b_upper[i]})
 
-p_opts = {"expand":True}
-s_opts = {"max_iter": 100}#, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
-hqp.opti.solver('ipopt', p_opts, s_opts)
-# hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': False, 'print_header': False, 'print_status': False, "print_time":False, 'max_iter': 1000})
+# p_opts = {"expand":True}
+# s_opts = {"max_iter": 100, 'tol':1e-8}#, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
+# hqp.opti.solver('ipopt', p_opts, s_opts)
+hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': False, 'print_header': False, 'print_status': False, "print_time":False, 'max_iter': 1000})
 
 hqp.variables0 = params
 hqp.configure()
 
-hqp.setup_cascadedQP()
+# hqp.setup_cascadedQP()
 sol_chqp = hqp.solve_cascadedQP(params_init, [0]*n)
-sol = hqp.solve_HQPl1(params_init, [0]*n)
+sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = 5.0)
 
 x_dot_sol = sol.value(x_dot)
 print(x_dot_sol)
 con_viol = []
 for i in range(1,pl):
 	con_viol.append(cs.norm_1(sol.value(hqp.slacks[i])))
-print(con_viol)
 
-print(x_dot_sol)
-con_viol = []
+con_viol2 = []
+x_dot_sol2 = sol_chqp[pl - 1].value(x_dot)
+print(x_dot_sol2)
 for i in range(1,pl):
-	print(sol.value(hqp.slacks[i]))
-	con_viol.append(cs.norm_1(sol.value(hqp.slacks[i])))
+	con_viol2.append(cs.norm_1(sol_chqp[pl-1].value(hqp.slacks[i])))
+
 print(con_viol)
-print(time.time() - tic)
+print(con_viol2)
+print(sol_chqp[pl - 1].value(hqp.constraints[1]))
+print(hqp.constraint_options_lb[1])
+print(hqp.constraint_options_ub[1])

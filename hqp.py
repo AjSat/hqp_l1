@@ -65,6 +65,7 @@ class hqp:
 		if priority >= 1:
 			shape = expression.shape[0]
 			slack_var = opti.variable(shape, 1)
+			self.obj += cs.sumsqr(slack_var)*1e-6 #regularization
 			slack_weights = opti.parameter(shape, 1)
 
 			if ctype == 'equality':
@@ -95,17 +96,23 @@ class hqp:
 			self.slacks[priority] = cs.vertcat(self.slacks[priority], slack_var)
 			self.slack_weights[priority] = cs.vertcat(self.slack_weights[priority], slack_weights)
 			self.constraints[priority] = cs.vertcat(self.constraints[priority], expression)
-			self.constraint_type[priority].append((expression.shape[0], ctype))
+			self.constraint_type[priority] = self.constraint_type[priority] +  [ctype]*expression.shape[0]
 			if 'lb' in options:
-				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], options['lb'])
+				if options['lb'].shape[0] != 1:
+					self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], options['lb'])
+				else:
+					self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], options['lb']*expression.shape[0])
 			else:
 				print(expression.shape)
-				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], cs.DM.zeros(expression.shape[0]))
+				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], cs.DM.ones(expression.shape[0])*(-cs.inf))
 
 			if 'ub' in options:
-				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], options['ub'])
+				if options['ub'].shape[0] != 1:
+					self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], options['ub'])
+				else:
+					self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], options['ub']*expression.shape[0])
 			else:
-				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], cs.MX([0]*expression.shape[0]))
+				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], cs.DM.ones(expression.shape[0])*(cs.inf))
 
 		elif priority == 0:
 			if ctype == 'equality':
@@ -162,44 +169,71 @@ class hqp:
 	def solve_cascadedQP(self, variable_values, variable_dot_values):
 
 		sol_cqp = {}
-		gain = 1 #just set some value for the L1 penalty on task constraints
+		gain = 100 #just set some value for the L1 penalty on task constraints
 		number_priorities = len(self.slacks)
 		# print(self.slacks)
-		for priority in range(1, number_priorities + 1):
+		for priority in range(0, number_priorities + 1):
 			print("solving for priority level = " + str(priority))
-			opti = self.cHQP[priority] #loading the opti instance for the first priority level
+			opti = copy.deepcopy(self.opti)
 			opti.set_value(self.variables0, variable_values)
 			opti.set_initial(self.variables_dot, variable_dot_values)
 
 			#set weights for all constraints to zero
 			for j in range(1, number_priorities + 1):
 				opti.set_value(self.slack_weights[j], [0]*self.slack_weights[j].shape[0])
-			#set weights only for the constraints of this particular priority level
-			constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
-			for j in range(constraints.shape[0]):
-				weight = gain/cs.norm_1(constraints[j, :])
-				# opti.set_value(self.slack_weights[priority][j], weight)
 
-			#set the values of the slack variables of the previous priority levels
-			#with the solution from the previous QP
-			for j in range(1, priority):
-				#obtain the slack weights from the solution of the previous QP
-				sol_previous_qp = sol_cqp[priority - 1].value(self.slacks[j])
-				opti.set_value(self.cHQP_slackparams[priority][j], sol_previous_qp)
+			if priority >= 1:
+				#set weights only for the constraints of this particular priority level
+				constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
+				for j in range(constraints.shape[0]):
+					weight = gain/cs.norm_1(constraints[j, :])
+					opti.set_value(self.slack_weights[priority][j], weight)
+
+				#create the hard constraits for the constraints from the previous levels
+				for j in range(1,priority):
+					#compute solution of constraints from this level from 
+					#the most recent qp sol
+					constraints = self.constraints[j]
+					constraints_sol = sol_cqp[priority-1].value(constraints)
+					constraint_type = self.constraint_type[j]
+					constraint_options_ub = self.constraint_options_ub[j]
+					constraint_options_lb = self.constraint_options_lb[j]
+					#check if the constraint is active and make it a hard constraint
+					for k in range(constraints.shape[0]):
+						#if equality constraint, always active
+						if constraint_type[k] == 'equality':
+							opti.subject_to(constraints_sol[k] == constraints[k])
+						#else check if active
+						else:
+							# print(constraints_sol)
+							#if violated add as equality constraint
+							# print("constraint sol is = " + str(constraints_sol[k]))
+							if constraints_sol[k] - constraint_options_lb[k] <= -1e-6:
+								opti.subject_to(constraints_sol[k] == constraints[k])
+							#if just active add as inequality constraint
+							else:# constraints_sol[k] - constraint_options_lb[k] <= 1e-6:
+								opti.subject_to(constraint_options_lb[k] <= constraints[k])
+							if constraints_sol[k] - constraint_options_ub[k] >= 1e-6:
+								print("forcing " + str(k)+"th value of " + str(j) + "th priority constraint to be equal to constraint val" + str(constraints_sol[k]))
+								opti.subject_to(constraints_sol[k] == constraints[k])
+							else:# constraints_sol[k] - constraint_options_ub[k] >= -1e-6:
+								opti.subject_to(constraint_options_ub[k] >= constraints[k])
+								#opti.subject_to(constraints_sol[k])
 
 			#solve the QP for this priority level
-			print(opti.p.shape)
-			print(self.opti.p.shape)
+			# print(opti.p.shape)
+			# print(self.opti.p.shape)
 			blockPrint()
 			sol = opti.solve()
 			enablePrint()
+			# cHQP[priority] = opti
 			sol_cqp[priority] = sol
 
 		return sol_cqp
 			
 
 
-	def solve_HQPl1(self, variable_values, variable_dot_values):
+	def solve_HQPl1(self, variable_values, variable_dot_values, gamma_init = None):
 
 		opti = self.opti
 		opti.set_value(self.variables0, variable_values)
@@ -207,7 +241,10 @@ class hqp:
 
 		#compute slack gains
 		gain_least_priority = 1
-		gamma = [0.25]*(self.number_priorities-1)
+		if gamma_init == None:
+			gamma = [0.25]*(self.number_priorities-1)
+		else:
+			gamma = [gamma_init]*(self.number_priorities-1)
 		cumulative_weight = 0
 		for i in range(0,self.number_priorities):
 			priority = self.number_priorities - i
