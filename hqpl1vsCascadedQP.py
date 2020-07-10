@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 import math
 import time
 import matplotlib.pyplot as plt
-
+import json
+import pickle
 import copy
 
 # Disable
@@ -26,29 +27,31 @@ def blockPrint():
 def enablePrint():
     sys.stdout = sys.__stdout__
 
+#making this a function: dictionary input takes n, total_eq_constraints, total_ineq_constraints, pl (priority levels)
+#random seed, gamma value
+#gets as output whether cHQP ran, HQP-L1 ran, hierarchy failure, same constraints, identical solution, geq_constraints
 
+def hqpvschqp(params):
 
-n = 25
-total_eq_constraints = 25
-total_ineq_constraints = 25
-pl = 2 #priority levels
+	n = params['n']
+	total_eq_constraints = params['total_eq_constraints']
+	total_ineq_constraints = params['total_ineq_constraints']
+	pl = params['pl'] #priority levels
+	gamma = params['gamma']
+	rand_seed = params['rand_seed']
 
-n_eq_per_level = int(total_eq_constraints / pl)
-eq_first_level = n_eq_per_level + (total_eq_constraints - n_eq_per_level*pl)
-n_ineq_per_level = int(total_ineq_constraints / pl)
-ineq_first_level = n_ineq_per_level + (total_ineq_constraints - n_ineq_per_level*pl)
-print(n_eq_per_level)
-print(n_ineq_per_level)
-print(eq_first_level)
-print(ineq_first_level)
-count_hierarchy_failue = 0
-count_same_constraints = 0
-count_identical_solution = 0
-count_geq_constraints = 0
-
-gamma_vals = [0.01, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
-
-for rand_seed in range(1000,1050):
+	n_eq_per_level = int(total_eq_constraints / pl)
+	eq_first_level = n_eq_per_level + (total_eq_constraints - n_eq_per_level*pl)
+	n_ineq_per_level = int(total_ineq_constraints / pl)
+	ineq_first_level = n_ineq_per_level + (total_ineq_constraints - n_ineq_per_level*pl)
+	# print(n_eq_per_level)
+	# print(n_ineq_per_level)
+	# print(eq_first_level)
+	# print(ineq_first_level)
+	count_hierarchy_failue = 0
+	count_same_constraints = 0
+	count_identical_solution = 0
+	count_geq_constraints = 0
 	
 	hqp = hqp_p.hqp()
 	print("Using random seed " + str(rand_seed))
@@ -119,9 +122,22 @@ for rand_seed in range(1000,1050):
 	hqp.configure()
 
 	# hqp.setup_cascadedQP()
+	
 	sol_chqp = hqp.solve_cascadedQP(params_init, [0]*n)
-	sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = 200.0)
-	enablePrint()
+	chqp_status = sol_chqp != False
+	if not chqp_status:
+		print("cHQP failed")
+		return False, False, False, False, False
+
+
+	sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = gamma)
+	hqp_status = sol != False
+	
+	if not hqp_status:
+		print("hqp-l1 failed")
+		return False, False, False, True, False
+
+
 
 	x_dot_sol = sol.value(x_dot)
 	# print(x_dot_sol)
@@ -133,7 +149,7 @@ for rand_seed in range(1000,1050):
 	geq_constraints_satisfied = True
 	same_constraints_satisfied = True
 
-	verbose = True
+	verbose = False
 	for i in range(1,pl):
 		
 		sol_hqp = sol.value(hqp.slacks[i])
@@ -171,35 +187,96 @@ for rand_seed in range(1000,1050):
 
 
 
-	print(con_viol)
-	print(con_viol2)
-	print("diff between solutions = " + str(max(cs.fabs(x_dot_sol - x_dot_sol2).full())))
+	# print(con_viol)
+	# print(con_viol2)
+	# print("diff between solutions = " + str(max(cs.fabs(x_dot_sol - x_dot_sol2).full())))
 
-	if max(cs.fabs(x_dot_sol - x_dot_sol2).full()) <= 1e-4:
-		print("Identical solution by both methods!!")
+	identical_solution = max(cs.fabs(x_dot_sol - x_dot_sol2).full()) <= 1e-4
+	if identical_solution:
+		# print("Identical solution by both methods!!")
 		count_identical_solution += 1
 		count_geq_constraints += 1
 		count_same_constraints += 1
 	
 	elif same_constraints_satisfied:
-		print("same constraints are satisfied")
+		# print("same constraints are satisfied")
 		count_same_constraints += 1
 		count_geq_constraints += 1
 	
 	elif geq_constraints_satisfied:
-		print("The same of greater number of constriants satisfied at each level")
+		# print("The same of greater number of constriants satisfied at each level")
 		count_geq_constraints += 1
 
 	else:
-		print("hierarchy failed!!!!!!!!!!!!!!!!")
+		# print("hierarchy failed!!!!!!!!!!!!!!!!")
 		count_hierarchy_failue += 1
+	if verbose:
+		print("hierarchy failed " + str(count_hierarchy_failue))
+		print("Identical solution " + str(count_identical_solution))
+		print("Same constraints satisfied " + str(count_same_constraints))
+		print("Geq constraints satisfied " + str(count_geq_constraints))
 
-print("hierarchy failed " + str(count_hierarchy_failue))
-print("Identical solution " + str(count_identical_solution))
-print("Same constraints satisfied " + str(count_same_constraints))
-print("Geq constraints satisfied " + str(count_geq_constraints))
-
+	return identical_solution[0], same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status
 # print(sol_chqp[pl - 1].value(hqp.constraints[1]))
 # print(hqp.constraint_options_lb[1])
 # print(hqp.constraint_options_ub[1])
+
+if __name__ == "__main__":
+
+	n = 25
+	total_eq_constraints = 25
+	total_ineq_constraints = 25
+	params = {}
+	params['n'] = n
+	params['total_eq_constraints'] = total_eq_constraints
+	params['total_ineq_constraints'] = total_ineq_constraints
+	gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
+	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+	results = {}
+
+	verbose = False
+
+	for gamma in gamma_vals:
+		print("gamma value :" + str(gamma))
+		for pl in pl_vals:
+			print("priority levels :" + str(pl))
+			count_hierarchy_failue = 0
+			count_same_constraints = 0
+			count_identical_solution = 0
+			count_geq_constraints = 0
+			total_trials = 0
+			params['pl'] = pl
+			params['gamma'] = gamma
+			for rand_seed in range(1000, 1100):
+				# print(rand_seed)
+				params['rand_seed'] = rand_seed
+				identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status = hqpvschqp(params)
+				
+				if chqp_status:
+					total_trials += 1
+					if identical_solution:
+						count_identical_solution += 1
+						count_geq_constraints += 1
+						count_same_constraints += 1
+					elif same_constraints_satisfied:
+						count_same_constraints += 1
+						count_geq_constraints += 1
+					elif geq_constraints_satisfied:
+						count_geq_constraints += 1
+					else:
+
+						count_hierarchy_failue += 1
+			if verbose:
+				print("hierarchy failed " + str(count_hierarchy_failue))
+				print("Identical solution " + str(count_identical_solution))
+				print("Same constraints satisfied " + str(count_same_constraints))
+				print("Geq constraints satisfied " + str(count_geq_constraints))
+				print('Total trials ' + str(total_trials))
+
+			results[str(pl) + ',' str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials]
+
+	print(results)
+	with open('../hqp_l1/hqp_vs_chqp_results.txt', 'w') as fp:
+		json.dump(results, fp)
 

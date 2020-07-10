@@ -223,9 +223,11 @@ class hqp:
 			#solve the QP for this priority level
 			# print(opti.p.shape)
 			# print(self.opti.p.shape)
-			blockPrint()
-			sol = opti.solve()
-			enablePrint()
+			try:
+				sol = opti.solve()
+			except:
+				return False
+				break
 			# cHQP[priority] = opti
 			sol_cqp[priority] = sol
 
@@ -263,9 +265,12 @@ class hqp:
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
 		print("Cumulative weight is " + str(cumulative_weight))
-		# blockPrint()
-		sol = opti.solve()
-		# enablePrint()
+		blockPrint()
+		try:
+			sol = opti.solve()
+		except:
+			sol = False
+		enablePrint()
 		
 		# opti2 = copy.deepcopy(opti)
 		# opti2.set_value(self.variables0, variable_values)
