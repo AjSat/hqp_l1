@@ -103,7 +103,7 @@ class hqp:
 				else:
 					self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], options['lb']*expression.shape[0])
 			else:
-				print(expression.shape)
+				# print(expression.shape)
 				self.constraint_options_lb[priority] = cs.vertcat(self.constraint_options_lb[priority], cs.DM.ones(expression.shape[0])*(-cs.inf))
 
 			if 'ub' in options:
@@ -173,7 +173,7 @@ class hqp:
 		number_priorities = len(self.slacks)
 		# print(self.slacks)
 		for priority in range(0, number_priorities + 1):
-			print("solving for priority level = " + str(priority))
+			# print("solving for priority level = " + str(priority))
 			opti = copy.deepcopy(self.opti)
 			opti.set_value(self.variables0, variable_values)
 			opti.set_initial(self.variables_dot, variable_dot_values)
@@ -214,7 +214,7 @@ class hqp:
 							else:# constraints_sol[k] - constraint_options_lb[k] <= 1e-6:
 								opti.subject_to(constraint_options_lb[k] <= constraints[k])
 							if constraints_sol[k] - constraint_options_ub[k] >= 1e-6:
-								print("forcing " + str(k)+"th value of " + str(j) + "th priority constraint to be equal to constraint val" + str(constraints_sol[k]))
+								# print("forcing " + str(k)+"th value of " + str(j) + "th priority constraint to be equal to constraint val" + str(constraints_sol[k]))
 								opti.subject_to(constraints_sol[k] == constraints[k])
 							else:# constraints_sol[k] - constraint_options_ub[k] >= -1e-6:
 								opti.subject_to(constraint_options_ub[k] >= constraints[k])
@@ -262,10 +262,10 @@ class hqp:
 					# print(weight)
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
-		print("Cumulative weight is")
-		print(cumulative_weight)
+		print("Cumulative weight is " + str(cumulative_weight))
+		# blockPrint()
 		sol = opti.solve()
-
+		# enablePrint()
 		
 		# opti2 = copy.deepcopy(opti)
 		# opti2.set_value(self.variables0, variable_values)
