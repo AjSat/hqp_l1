@@ -61,9 +61,19 @@ def hqpvschqp(params):
 	#15, 18, 11 for 8 priority levels
 	
 	x, x_dot = hqp.create_variable(n, 1e-6)
-	A_eq_all = cs.DM(np.random.randn(total_eq_constraints, n))
+	A_eq_all = cs.DM(np.random.randn(params['eq_con_rank'], n))
+	A_extra = (A_eq_all.T@cs.DM(np.random.randn(params['eq_con_rank'], total_eq_constraints - params['eq_con_rank']))).T
+	A_eq_all = cs.vertcat(A_eq_all, A_extra)
+	A_eq_all = A_eq_all.full()
+	np.random.shuffle(A_eq_all)
+	# print(A_eq_all)
+	# afsdkl= jkljl
 	b_eq_all = np.random.randn(total_eq_constraints)
-	A_ineq_all = cs.DM(np.random.randn(total_ineq_constraints, n))
+	A_ineq_all = cs.DM(np.random.randn(params['ineq_con_rank'], n))
+	A_ineq_extra = (A_ineq_all.T@cs.DM(np.random.randn(params['ineq_con_rank'], total_ineq_constraints - params['ineq_con_rank']))).T
+	A_ineq_all = cs.vertcat(A_ineq_all, A_ineq_extra)
+	A_ineq_all = A_ineq_all.full()
+	np.random.shuffle(A_ineq_all)
 	b_ineq_all = np.random.randn(total_ineq_constraints)
 
 	A_eq = {}
@@ -117,7 +127,7 @@ def hqpvschqp(params):
 	# hqp.opti.solver('ipopt', p_opts, s_opts)
 	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': False, 'print_header': True, 'print_status': False, "print_time":False, 'max_iter': 1000})
 
-	blockPrint()
+	# blockPrint()
 	hqp.variables0 = params
 	hqp.configure()
 
@@ -130,8 +140,10 @@ def hqpvschqp(params):
 		return False, False, False, False, False
 
 
-	sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = gamma)
+	# sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = gamma)
+	sol = hqp.solve_adaptive_hqp(params_init, [0]*n, gamma_init = gamma)
 	hqp_status = sol != False
+	# enablePrint()
 	
 	if not hqp_status:
 		print("hqp-l1 failed")
@@ -149,7 +161,7 @@ def hqpvschqp(params):
 	geq_constraints_satisfied = True
 	same_constraints_satisfied = True
 
-	verbose = False
+	verbose = True
 	for i in range(1,pl):
 		
 		sol_hqp = sol.value(hqp.slacks[i])
@@ -186,10 +198,10 @@ def hqpvschqp(params):
 
 
 
-
-	# print(con_viol)
-	# print(con_viol2)
-	# print("diff between solutions = " + str(max(cs.fabs(x_dot_sol - x_dot_sol2).full())))
+	if verbose:
+		print(con_viol)
+		print(con_viol2)
+		# print("diff between solutions = " + str(max(cs.fabs(x_dot_sol - x_dot_sol2).full())))
 
 	identical_solution = max(cs.fabs(x_dot_sol - x_dot_sol2).full()) <= 1e-4
 	if identical_solution:
@@ -223,16 +235,22 @@ def hqpvschqp(params):
 
 if __name__ == "__main__":
 
-	n = 25
-	total_eq_constraints = 25
-	total_ineq_constraints = 25
+	n = 4
+	total_eq_constraints = 6
+	eq_con_rank = 3
+	total_ineq_constraints = 6
+	ineq_con_rank = 3
 	params = {}
 	params['n'] = n
+	params['eq_con_rank'] = eq_con_rank
+	params['ineq_con_rank'] = ineq_con_rank
 	params['total_eq_constraints'] = total_eq_constraints
 	params['total_ineq_constraints'] = total_ineq_constraints
-	gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
-	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
+	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+	gamma_vals = [1.0]
+	pl_vals = [5]
 	results = {}
 
 	verbose = False
@@ -248,7 +266,7 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1100):
+			for rand_seed in range(1001, 1010):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
 				identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status = hqpvschqp(params)
@@ -274,7 +292,7 @@ if __name__ == "__main__":
 				print("Geq constraints satisfied " + str(count_geq_constraints))
 				print('Total trials ' + str(total_trials))
 
-			results[str(pl) + ',' str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials]
+			results[str(pl) + ',' + str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials]
 
 	print(results)
 	with open('../hqp_l1/hqp_vs_chqp_results.txt', 'w') as fp:

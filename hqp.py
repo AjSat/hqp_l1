@@ -26,6 +26,8 @@ class hqp:
 		self.slacks = {} #Slacks for the constraints
 		self.slack_weights = {} #the weights for the slack variables
 		self.constraints = {}
+		self.constraints_numbers = {} #stores the correspondence between constraint id in opti.g
+		#and the constraints of a particular priority.
 		self.constraint_type = {}
 		self.constraint_options_lb = {}
 		self.constraint_options_ub = {}
@@ -33,6 +35,7 @@ class hqp:
 		self.cascadedHQP_active = False
 		self.opti = cs.Opti() #creating CasADi's optistack
 		self.obj = 0 #the variable to be minimized.
+		self.constraint_counter = 0
 
 	def activate_cascadedHQP(priority_levels):
 		""" Should be activated before creating any variables or adding any constraints"""
@@ -62,29 +65,8 @@ class hqp:
 	def create_constraint(self, expression, ctype, priority = 0, options = {}):
 
 		opti = self.opti
+		shape = expression.shape[0]
 		if priority >= 1:
-			shape = expression.shape[0]
-			slack_var = opti.variable(shape, 1)
-			self.obj += cs.sumsqr(slack_var)*1e-6 #regularization
-			slack_weights = opti.parameter(shape, 1)
-
-			if ctype == 'equality':
-				opti.subject_to(-slack_var <= (expression <= slack_var))
-
-			elif ctype == 'lub':
-				opti.subject_to(-slack_var + options['lb'] <= (expression <= slack_var + options['ub']))
-				opti.subject_to(slack_var >= 0)
-
-			elif ctype == 'ub':
-				opti.subject_to(expression <= slack_var + options['ub'])
-				opti.subject_to(slack_var >= 0)
-
-			elif ctype == 'lb':
-				opti.subject_to(-slack_var + options['lb'] <= expression)
-				opti.subject_to(slack_var >= 0)
-
-			self.obj += cs.mtimes(slack_weights.T, slack_var)
-
 			if priority not in self.slacks:
 				self.slacks[priority] = []
 				self.slack_weights[priority] = []
@@ -92,6 +74,43 @@ class hqp:
 				self.constraint_type[priority] = []
 				self.constraint_options_lb[priority]= []
 				self.constraint_options_ub[priority] = []
+				self.constraints_numbers[priority] = []
+
+			
+			slack_var = opti.variable(shape, 1)
+			self.obj += cs.sumsqr(slack_var)*1e-6 #regularization
+			slack_weights = opti.parameter(shape, 1)
+
+			if ctype == 'equality':
+				opti.subject_to(-slack_var <= (expression <= slack_var))
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter, self.constraint_counter + 1])
+					self.constraint_counter += 2
+
+			elif ctype == 'lub':
+				opti.subject_to(-slack_var + options['lb'] <= (expression <= slack_var + options['ub']))
+				opti.subject_to(slack_var >= 0)
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter, self.constraint_counter + 1, self.constraint_counter + 2])
+					self.constraint_counter += 3
+
+			elif ctype == 'ub':
+				opti.subject_to(expression <= slack_var + options['ub'])
+				opti.subject_to(slack_var >= 0)
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter, self.constraint_counter + 1])
+					self.constraint_counter += 2
+
+			elif ctype == 'lb':
+				opti.subject_to(-slack_var + options['lb'] <= expression)
+				opti.subject_to(slack_var >= 0)
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter, self.constraint_counter + 1])
+					self.constraint_counter += 2
+
+			self.obj += cs.mtimes(slack_weights.T, slack_var)
+
+			
 
 			self.slacks[priority] = cs.vertcat(self.slacks[priority], slack_var)
 			self.slack_weights[priority] = cs.vertcat(self.slack_weights[priority], slack_weights)
@@ -115,20 +134,35 @@ class hqp:
 				self.constraint_options_ub[priority] = cs.vertcat(self.constraint_options_ub[priority], cs.DM.ones(expression.shape[0])*(cs.inf))
 
 		elif priority == 0:
+			if priority not in self.constraints:
+				self.constraints[priority] = []
+				self.constraints_numbers[priority] = []
+
 			if ctype == 'equality':
 				opti.subject_to(expression == 0)
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter])
+					self.constraint_counter += 1
 
 			elif ctype == 'lub':
 				opti.subject_to( options['lb'] <= (expression <= options['ub']))
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter])
+					self.constraint_counter += 1
 
 			elif ctype == 'ub':
 				opti.subject_to(expression <= options['ub'])
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter])
+					self.constraint_counter += 1
 
 			elif ctype == 'lb':
 				opti.subject_to(options['lb'] <= expression)
+				for i in range(shape):
+					self.constraints_numbers[priority].append([self.constraint_counter])
+					self.constraint_counter += 1
 
-			if priority not in self.constraints:
-				self.constraints[priority] = []
+			
 
 			self.constraints[priority] = cs.vertcat(self.constraints[priority], expression)
 
@@ -265,13 +299,19 @@ class hqp:
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
 		print("Cumulative weight is " + str(cumulative_weight))
-		blockPrint()
+		# blockPrint()
 		try:
 			sol = opti.solve()
 		except:
 			sol = False
-		enablePrint()
+		# enablePrint()
 		
+		print(sol.value(opti.lam_g))
+		Jg = sol.value(cs.jacobian(opti.g, opti.x))
+		Jf = sol.value(cs.jacobian(opti.f, opti.x))
+		print(Jg.toarray())
+		print( Jf.T)
+		print("Constraint numbers are : " + str(self.constraints_numbers))
 		# opti2 = copy.deepcopy(opti)
 		# opti2.set_value(self.variables0, variable_values)
 		# p_opts = {"expand":True}
@@ -282,6 +322,72 @@ class hqp:
 		return sol
 
 		print("Not implemented")
+
+	#A method to adaptively change the values of gamma to better deal with the conditioning issues
+	#and to detect and eliminate hierarchy violation
+	def solve_adaptive_hqp(self, variable_values, variable_dot_values, gamma_init = None):
+		opti = self.opti
+		sol = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init)
+		#check if the hierarchy fails
+		#compute the constraint Jacobian
+		Jg = sol.value(cs.jacobian(opti.g, opti.x))
+		#compute the gradient of the objective
+		Jf = sol.value(cs.jacobian(opti.f, opti.x))
+		#compute the Lagrange multipliers
+		lam_g = sol.value(opti.lam_g)
+		infeasible_constraints = {}
+		#compute grad_i: the sum of all gradients t.e.m the ith priority level
+		grad_i = {}
+		g_infeasible = {}
+		for i in range(0, self.number_priorities):
+			if i == 0:
+				grad_i[i] = Jf.T
+			else:
+				grad_i[i] = grad_i[i-1]
+			for constraints_numbers in self.constraints_numbers[i]:
+				for c in constraints_numbers:
+					grad_i[i] += Jg[c]*lam_g[c]
+
+			#Find out which constriants are infeasible at each priority level
+			pl = self.number_priorities - i #starting from the lowest priority constraint
+			con_viols = sol.value(self.slacks[pl])
+			print(con_viols)
+			con_violated = con_viols >= 1e-7 #boolean array signifying which constraints are violated
+			print(con_violated)
+			con_violated = [j for j, s in enumerate(con_violated) if s]
+			infeasible_constraints[pl] = con_violated
+
+			#computing g_infeasible
+			if i == 0:
+				g_infeasible[pl] = np.array([0]*opti.x.shape[0])
+			else:
+				g_infeasible[pl] = g_infeasible[pl + 1]
+			for con in con_violated:
+				for c in self.constraints_numbers[pl][con]:
+					g_infeasible[pl] += Jg[c]*lam_g[c]
+		print("Infeasible constriants are " + str(infeasible_constraints))
+		#Detect failure of hierarchy using the Lagrange multipliers
+		hierarchy_failure = {} #stores which constraint at which level failed
+		for pl in range(1, self.number_priorities):
+			for c in infeasible_constraints[pl]:
+
+				#compute the residual of gradient of Lagrangian
+				grad = Jf*0
+				for con in self.constraints_numbers[pl][c]:
+					grad += Jg[con]*lam_g[con]
+				print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
+				print("grad_i + g_infeasible : " + str(grad_i[pl] + g_infeasible[pl + 1]))
+				residual = (grad_i[pl] + g_infeasible[pl + 1])@grad.T/cs.norm_1(grad)
+				print("Corresponding residual :" + str(residual)) 
+				print("Corresponding relative residual :" + str(cs.norm_1(residual)/cs.norm_1(grad))) 
+				if cs.norm_1(residual)/cs.norm_1(grad) >= 0.01:
+					hierarchy_failure[(pl, c)] = True
+
+
+		# print(grad_i)
+		# print(g_infeasible)
+		print("Hierarchy failure is : " + str(hierarchy_failure))
+		return sol#, hierarchy_failure
 
 # Disable
 def blockPrint():
