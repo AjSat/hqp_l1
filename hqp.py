@@ -203,7 +203,7 @@ class hqp:
 	def solve_cascadedQP(self, variable_values, variable_dot_values):
 
 		sol_cqp = {}
-		gain = 100 #just set some value for the L1 penalty on task constraints
+		gain = 1000 #just set some value for the L1 penalty on task constraints
 		number_priorities = len(self.slacks)
 		# print(self.slacks)
 		for priority in range(0, number_priorities + 1):
@@ -280,7 +280,10 @@ class hqp:
 		if gamma_init == None:
 			gamma = [0.25]*(self.number_priorities-1)
 		else:
-			gamma = [gamma_init]*(self.number_priorities-1)
+			if isinstance(gamma_init, float):
+				gamma = [gamma_init]*(self.number_priorities-1)
+			else:
+				gamma = gamma_init
 		cumulative_weight = 0
 		for i in range(0,self.number_priorities):
 			priority = self.number_priorities - i
@@ -299,19 +302,20 @@ class hqp:
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					opti.set_value(self.slack_weights[priority][j], weight)
 		print("Cumulative weight is " + str(cumulative_weight))
-		# blockPrint()
+		blockPrint()
 		try:
 			sol = opti.solve()
 		except:
 			sol = False
-		# enablePrint()
+		enablePrint()
 		
-		print(sol.value(opti.lam_g))
-		Jg = sol.value(cs.jacobian(opti.g, opti.x))
-		Jf = sol.value(cs.jacobian(opti.f, opti.x))
-		print(Jg.toarray())
-		print( Jf.T)
-		print("Constraint numbers are : " + str(self.constraints_numbers))
+		# print(sol.value(opti.lam_g))
+		# Jg = sol.value(cs.jacobian(opti.g, opti.x))
+		# Jf = sol.value(cs.jacobian(opti.f, opti.x))
+		# print(Jg.toarray())
+		# print( Jf.T)
+		# print("Constraint Jacobian shape is:" + str(Jg.shape))
+		# print("Constraint numbers are : " + str(self.constraints_numbers))
 		# opti2 = copy.deepcopy(opti)
 		# opti2.set_value(self.variables0, variable_values)
 		# p_opts = {"expand":True}
@@ -327,67 +331,84 @@ class hqp:
 	#and to detect and eliminate hierarchy violation
 	def solve_adaptive_hqp(self, variable_values, variable_dot_values, gamma_init = None):
 		opti = self.opti
-		sol = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init)
-		#check if the hierarchy fails
-		#compute the constraint Jacobian
-		Jg = sol.value(cs.jacobian(opti.g, opti.x))
-		#compute the gradient of the objective
-		Jf = sol.value(cs.jacobian(opti.f, opti.x))
-		#compute the Lagrange multipliers
-		lam_g = sol.value(opti.lam_g)
-		infeasible_constraints = {}
-		#compute grad_i: the sum of all gradients t.e.m the ith priority level
-		grad_i = {}
-		g_infeasible = {}
-		for i in range(0, self.number_priorities):
-			if i == 0:
-				grad_i[i] = Jf.T
+		gamma_init = [gamma_init]*(self.number_priorities-1)
+		hierarcy_failed = True
+		loop_counter = 0
+		hierarchy_failure = {}
+		while hierarcy_failed and loop_counter < 10:
+			loop_counter += 1
+			sol = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init)
+			if not sol:
+				return sol, hierarchy_failure
+			#check if the hierarchy fails
+			#compute the constraint Jacobian
+			Jg = sol.value(cs.jacobian(opti.g, opti.x))
+			#compute the gradient of the objective
+			Jf = sol.value(cs.jacobian(opti.f, opti.x))
+			#compute the Lagrange multipliers
+			lam_g = sol.value(opti.lam_g)
+			infeasible_constraints = {}
+			#compute grad_i: the sum of all gradients t.e.m the ith priority level
+			grad_i = {}
+			g_infeasible = {}
+			for i in range(0, self.number_priorities):
+				if i == 0:
+					grad_i[i] = Jf.T
+				else:
+					grad_i[i] = grad_i[i-1]
+				for constraints_numbers in self.constraints_numbers[i]:
+					for c in constraints_numbers:
+						grad_i[i] += Jg[c]*lam_g[c]
+
+				#Find out which constriants are infeasible at each priority level
+				pl = self.number_priorities - i #starting from the lowest priority constraint
+				con_viols = sol.value(self.slacks[pl])
+				print(con_viols)
+				con_violated = con_viols >= 1e-7 #boolean array signifying which constraints are violated
+				print(con_violated)
+				con_violated = [j for j, s in enumerate(con_violated) if s]
+				infeasible_constraints[pl] = con_violated
+
+				#computing g_infeasible
+				if i == 0:
+					g_infeasible[pl] = np.array([0]*opti.x.shape[0])
+				else:
+					g_infeasible[pl] = g_infeasible[pl + 1]
+				for con in con_violated:
+					for c in self.constraints_numbers[pl][con]:
+						g_infeasible[pl] += Jg[c]*lam_g[c]
+			print("Infeasible constriants are " + str(infeasible_constraints))
+			#Detect failure of hierarchy using the Lagrange multipliers
+			hierarchy_failure = {} #stores which constraint at which level failed
+			for pl in range(1, self.number_priorities):
+				for c in infeasible_constraints[pl]:
+
+					#compute the residual of gradient of Lagrangian
+					grad = Jf*0
+					for con in self.constraints_numbers[pl][c]:
+						grad += Jg[con]*lam_g[con]
+					# print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
+					# print("grad_i + g_infeasible : " + str(grad_i[pl] + g_infeasible[pl + 1]))
+					residual = (grad_i[pl] + g_infeasible[pl + 1])@grad.T/cs.norm_1(grad)
+					# print("Corresponding residual :" + str(residual)) 
+					residual2 = (grad_i[pl])@grad.T/cs.norm_1(grad)
+					print("Corresponding relative residual :" + str(cs.norm_1(residual)/cs.norm_1(grad))) 
+					print("Residual agnostic to feasibility of lower cons:" + str(cs.norm_1(residual2)/cs.norm_1(grad))) 
+					if cs.norm_1(residual)/cs.norm_1(grad) >= 1e-5:
+						hierarchy_failure[(pl, c)] = True
+
+
+			# print(grad_i)
+			# print(g_infeasible)
+			print("Hierarchy failure is : " + str(hierarchy_failure))
+			if len(hierarchy_failure) == 0:
+				hierarcy_failed = False
 			else:
-				grad_i[i] = grad_i[i-1]
-			for constraints_numbers in self.constraints_numbers[i]:
-				for c in constraints_numbers:
-					grad_i[i] += Jg[c]*lam_g[c]
+				keys = hierarchy_failure.keys()
+				for k in keys:
+					gamma_init[k[0]-1] = 2*gamma_init[k[0]-1]
 
-			#Find out which constriants are infeasible at each priority level
-			pl = self.number_priorities - i #starting from the lowest priority constraint
-			con_viols = sol.value(self.slacks[pl])
-			print(con_viols)
-			con_violated = con_viols >= 1e-7 #boolean array signifying which constraints are violated
-			print(con_violated)
-			con_violated = [j for j, s in enumerate(con_violated) if s]
-			infeasible_constraints[pl] = con_violated
-
-			#computing g_infeasible
-			if i == 0:
-				g_infeasible[pl] = np.array([0]*opti.x.shape[0])
-			else:
-				g_infeasible[pl] = g_infeasible[pl + 1]
-			for con in con_violated:
-				for c in self.constraints_numbers[pl][con]:
-					g_infeasible[pl] += Jg[c]*lam_g[c]
-		print("Infeasible constriants are " + str(infeasible_constraints))
-		#Detect failure of hierarchy using the Lagrange multipliers
-		hierarchy_failure = {} #stores which constraint at which level failed
-		for pl in range(1, self.number_priorities):
-			for c in infeasible_constraints[pl]:
-
-				#compute the residual of gradient of Lagrangian
-				grad = Jf*0
-				for con in self.constraints_numbers[pl][c]:
-					grad += Jg[con]*lam_g[con]
-				print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
-				print("grad_i + g_infeasible : " + str(grad_i[pl] + g_infeasible[pl + 1]))
-				residual = (grad_i[pl] + g_infeasible[pl + 1])@grad.T/cs.norm_1(grad)
-				print("Corresponding residual :" + str(residual)) 
-				print("Corresponding relative residual :" + str(cs.norm_1(residual)/cs.norm_1(grad))) 
-				if cs.norm_1(residual)/cs.norm_1(grad) >= 0.01:
-					hierarchy_failure[(pl, c)] = True
-
-
-		# print(grad_i)
-		# print(g_infeasible)
-		print("Hierarchy failure is : " + str(hierarchy_failure))
-		return sol#, hierarchy_failure
+		return sol, hierarchy_failure
 
 # Disable
 def blockPrint():

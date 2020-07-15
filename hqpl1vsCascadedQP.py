@@ -127,27 +127,41 @@ def hqpvschqp(params):
 	# hqp.opti.solver('ipopt', p_opts, s_opts)
 	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': False, 'print_header': True, 'print_status': False, "print_time":False, 'max_iter': 1000})
 
-	# blockPrint()
+	blockPrint()
 	hqp.variables0 = params
 	hqp.configure()
 
 	# hqp.setup_cascadedQP()
+	adaptive_method = True
 	
 	sol_chqp = hqp.solve_cascadedQP(params_init, [0]*n)
+	enablePrint()
 	chqp_status = sol_chqp != False
 	if not chqp_status:
 		print("cHQP failed")
-		return False, False, False, False, False
+		if not adaptive_method:
+			return False, False, False, False, False
+		else:
+			return False, False, False, False, False, False
 
-
-	# sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = gamma)
-	sol = hqp.solve_adaptive_hqp(params_init, [0]*n, gamma_init = gamma)
+	blockPrint()
+	if not adaptive_method:
+		sol = hqp.solve_HQPl1(params_init, [0]*n, gamma_init = gamma)
+	else:
+		sol, hierarchical_failure = hqp.solve_adaptive_hqp(params_init, [0]*n, gamma_init = gamma)
+		tp = 0 #true positive
+		fp = 0
+		tn = 0
+		fn = 0
 	hqp_status = sol != False
-	# enablePrint()
+	enablePrint()
 	
 	if not hqp_status:
 		print("hqp-l1 failed")
-		return False, False, False, True, False
+		if not adaptive_method:
+			return False, False, False, True, False
+		else:
+			return False, False, False, True, False, False
 
 
 
@@ -162,6 +176,8 @@ def hqpvschqp(params):
 	same_constraints_satisfied = True
 
 	verbose = True
+	running_counter_satisfied_con_hqp = 0
+	running_counter_satisfied_con_chqp = 0
 	for i in range(1,pl):
 		
 		sol_hqp = sol.value(hqp.slacks[i])
@@ -180,7 +196,9 @@ def hqpvschqp(params):
 			same_constraints_satisfied = False
 
 		#compute if a geq number of constraints are satisfied by the hqp
-		if sum(satisfied_con_hqp) < sum(satisfied_con_chqp):
+		running_counter_satisfied_con_chqp += sum(satisfied_con_chqp)
+		running_counter_satisfied_con_hqp += sum(satisfied_con_hqp)
+		if running_counter_satisfied_con_hqp < running_counter_satisfied_con_chqp:
 			geq_constraints_satisfied = False
 
 		if verbose: #make true if print
@@ -209,51 +227,77 @@ def hqpvschqp(params):
 		count_identical_solution += 1
 		count_geq_constraints += 1
 		count_same_constraints += 1
+		if adaptive_method:
+			if len(hierarchical_failure) > 0:
+				fp += 1
+			else:
+				tn += 1
 	
 	elif same_constraints_satisfied:
 		# print("same constraints are satisfied")
 		count_same_constraints += 1
 		count_geq_constraints += 1
+		if adaptive_method:
+			if len(hierarchical_failure) > 0:
+				fp += 1
+			else:
+				tn += 1
 	
 	elif geq_constraints_satisfied:
 		# print("The same of greater number of constriants satisfied at each level")
 		count_geq_constraints += 1
+		if adaptive_method:
+			if len(hierarchical_failure) > 0:
+				fp += 1
+			else:
+				tn += 1
 
 	else:
 		# print("hierarchy failed!!!!!!!!!!!!!!!!")
 		count_hierarchy_failue += 1
+		if adaptive_method:
+			if len(hierarchical_failure) > 0:
+				tp += 1
+			else:
+				fn += 1
 	if verbose:
 		print("hierarchy failed " + str(count_hierarchy_failue))
 		print("Identical solution " + str(count_identical_solution))
 		print("Same constraints satisfied " + str(count_same_constraints))
 		print("Geq constraints satisfied " + str(count_geq_constraints))
 
-	return identical_solution[0], same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status
+	if not adaptive_method:
+		return identical_solution[0], same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status
+	else:
+		return identical_solution[0], same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status, {'tn': tn, 'tp':tp, 'fp':fp, 'fn':fn}
 # print(sol_chqp[pl - 1].value(hqp.constraints[1]))
 # print(hqp.constraint_options_lb[1])
 # print(hqp.constraint_options_ub[1])
 
 if __name__ == "__main__":
 
-	n = 4
-	total_eq_constraints = 6
-	eq_con_rank = 3
-	total_ineq_constraints = 6
-	ineq_con_rank = 3
+	n = 25
+	total_eq_constraints = 25
+	eq_con_rank = 15
+	total_ineq_constraints = 25
+	ineq_con_rank = 15
 	params = {}
 	params['n'] = n
 	params['eq_con_rank'] = eq_con_rank
 	params['ineq_con_rank'] = ineq_con_rank
 	params['total_eq_constraints'] = total_eq_constraints
 	params['total_ineq_constraints'] = total_ineq_constraints
-	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
+	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
 	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+	gamma_vals = [0.1, 0.5, 1.0, 2.0, 5.0]
+	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
-	gamma_vals = [1.0]
-	pl_vals = [5]
+	# gamma_vals = [0.1]
+	# pl_vals = [25]
 	results = {}
 
-	verbose = False
+	verbose = True
+	adaptive_method = True
 
 	for gamma in gamma_vals:
 		print("gamma value :" + str(gamma))
@@ -263,13 +307,25 @@ if __name__ == "__main__":
 			count_same_constraints = 0
 			count_identical_solution = 0
 			count_geq_constraints = 0
+			if adaptive_method:
+				count_tp = 0
+				count_tn = 0
+				count_fp = 0
+				count_fn = 0
+				fp_cases = []
+				fn_cases = []
+
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1001, 1010):
+			for rand_seed in range(1000, 1010):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
-				identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status = hqpvschqp(params)
+				
+				if not adaptive_method:
+					identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status = hqpvschqp(params)
+				else:
+					identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status, hf_heuristic = hqpvschqp(params)
 				
 				if chqp_status:
 					total_trials += 1
@@ -285,15 +341,33 @@ if __name__ == "__main__":
 					else:
 
 						count_hierarchy_failue += 1
+
+					if adaptive_method and hqp_status:
+						count_tp += hf_heuristic['tp']
+						count_tn += hf_heuristic['tn']
+						count_fp += hf_heuristic['fp']
+						count_fn += hf_heuristic['fn']
+						if hf_heuristic['fp']:
+							fp_cases.append(rand_seed)
+						elif hf_heuristic['fn']:
+							fn_cases.append(rand_seed)
+
 			if verbose:
 				print("hierarchy failed " + str(count_hierarchy_failue))
 				print("Identical solution " + str(count_identical_solution))
 				print("Same constraints satisfied " + str(count_same_constraints))
 				print("Geq constraints satisfied " + str(count_geq_constraints))
 				print('Total trials ' + str(total_trials))
-
-			results[str(pl) + ',' + str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials]
-
+				if adaptive_method:
+					print("hierarchical failure detection by heuristic:")
+					print("FP = " + str(count_fp) + " FN = " + str(count_fn) + " TP = " + str(count_tp) + " TN = " + str(count_tn))
+					print("FP cases are " + str(fp_cases))
+					print("FN cases are " + str(fn_cases))
+			if not adaptive_method:
+				results[str(pl) + ',' + str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials]
+			else:
+				hf_heuristic = {'tp':count_tp, 'tn':count_tn, 'fn':count_fn, 'fp':count_fp}
+				results[str(pl) + ',' + str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials, hf_heuristic]
 	print(results)
 	with open('../hqp_l1/hqp_vs_chqp_results.txt', 'w') as fp:
 		json.dump(results, fp)
