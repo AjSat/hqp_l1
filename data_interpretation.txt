@@ -1,0 +1,18 @@
+hqp_vs_chqp_results1:
+
+25 variables, 20 equality constraints and 20 inequality constraints. No special care to make them rank deficient. 
+gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
+	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+hqp_vs_chqp_results2:
+
+25 variables, 25 equality constraints, but rank 15 and 25 inequality constraints, but rank 15. Remaining 10 are linear combinations of the first 15. 
+gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
+	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10] 
+
+hqp_vs_chqp_results_long:
+
+using the adaptive HQP method. So now also storing the FP, FN information. And 1000 trials
+25 variables, 25 equality constraints, but rank 15 and 25 inequality constraints, but rank 15. 
+# gamma_vals = [0.2,  1.0,  5.0]
+# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]

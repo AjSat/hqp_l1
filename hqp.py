@@ -137,7 +137,8 @@ class hqp:
 			if priority not in self.constraints:
 				self.constraints[priority] = []
 				self.constraints_numbers[priority] = []
-
+				self.constraint_type[priority] = []
+			self.constraint_type[priority] = self.constraint_type[priority] +  [ctype]*expression.shape[0]
 			if ctype == 'equality':
 				opti.subject_to(expression == 0)
 				for i in range(shape):
@@ -266,6 +267,57 @@ class hqp:
 			sol_cqp[priority] = sol
 
 		return sol_cqp
+
+	#following the convention of Kanoun 2011
+	def solve_cascadedQP2(self, variable_values, variable_dot_values):
+
+		sol_cqp = {}
+		gain = 1000 #just set some value for the L1 penalty on task constraints
+		number_priorities = len(self.slacks)
+		# print(self.slacks)
+		for priority in range(0, number_priorities + 1):
+			# print("solving for priority level = " + str(priority))
+			opti = copy.deepcopy(self.opti)
+			opti.set_value(self.variables0, variable_values)
+			opti.set_initial(self.variables_dot, variable_dot_values)
+
+			#set weights for all constraints to zero
+			for j in range(1, number_priorities + 1):
+				opti.set_value(self.slack_weights[j], [0]*self.slack_weights[j].shape[0])
+
+			if priority >= 1:
+				#set weights only for the constraints of this particular priority level
+				constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
+				for j in range(constraints.shape[0]):
+					weight = gain/cs.norm_1(constraints[j, :])
+					opti.set_value(self.slack_weights[priority][j], weight)
+
+				#create the hard constraits for the constraints from the previous levels
+				for j in range(1,priority):
+					#compute solution of constraints from this level from 
+					#the most recent qp sol
+					constraints = self.constraints[j]
+					constraints_sol = sol_cqp[priority-1].value(constraints)
+					slacks_sol = sol_cqp[priority-1].value(self.slacks[j])
+					constraint_type = self.constraint_type[j]
+					constraint_options_ub = self.constraint_options_ub[j]
+					constraint_options_lb = self.constraint_options_lb[j]
+					#check if the constraint is active and make it a hard constraint
+					for k in range(constraints.shape[0]):
+						opti.subject_to(self.slacks[j][k] <= slacks_sol[k])
+
+			#solve the QP for this priority level
+			# print(opti.p.shape)
+			# print(self.opti.p.shape)
+			try:
+				sol = opti.solve()
+			except:
+				return False
+				break
+			# cHQP[priority] = opti
+			sol_cqp[priority] = sol
+
+		return sol_cqp
 			
 
 
@@ -303,11 +355,16 @@ class hqp:
 					opti.set_value(self.slack_weights[priority][j], weight)
 		print("Cumulative weight is " + str(cumulative_weight))
 		blockPrint()
+		# enablePrint()
+		tic = time.time()
 		try:
 			sol = opti.solve()
 		except:
 			sol = False
-		enablePrint()
+		toc = time.time() - tic
+		self.time_taken += toc
+		blockPrint()
+		# enablePrint()
 		
 		# print(sol.value(opti.lam_g))
 		# Jg = sol.value(cs.jacobian(opti.g, opti.x))
@@ -331,6 +388,7 @@ class hqp:
 	#and to detect and eliminate hierarchy violation
 	def solve_adaptive_hqp(self, variable_values, variable_dot_values, gamma_init = None):
 		opti = self.opti
+		self.time_taken = 0
 		gamma_init = [gamma_init]*(self.number_priorities-1)
 		hierarcy_failed = True
 		loop_counter = 0
@@ -392,9 +450,11 @@ class hqp:
 					residual = (grad_i[pl] + g_infeasible[pl + 1])@grad.T/cs.norm_1(grad)
 					# print("Corresponding residual :" + str(residual)) 
 					residual2 = (grad_i[pl])@grad.T/cs.norm_1(grad)
-					print("Corresponding relative residual :" + str(cs.norm_1(residual)/cs.norm_1(grad))) 
+					# residual = (grad_i[pl] + g_infeasible[pl + 1])[0:self.variables_dot.shape[0]] / cs.norm_1(grad_i[pl] - grad_i[pl-1])
+					print("Corresponding relative residual :" + str(cs.norm_1(residual))) 
 					print("Residual agnostic to feasibility of lower cons:" + str(cs.norm_1(residual2)/cs.norm_1(grad))) 
 					if cs.norm_1(residual)/cs.norm_1(grad) >= 1e-5:
+					# if cs.norm_1(residual) >= 1e-3:
 						hierarchy_failure[(pl, c)] = True
 
 
@@ -407,7 +467,149 @@ class hqp:
 				keys = hierarchy_failure.keys()
 				for k in keys:
 					gamma_init[k[0]-1] = 2*gamma_init[k[0]-1]
+		enablePrint()
+		print("Total time taken adaptive HQP 1 = " + str(self.time_taken))
+		blockPrint()
+		return sol, hierarchy_failure
 
+	#An adaptive HQP method that uses a computationally demanding method to check the failure of hierarchy
+	#with the idea that it eliminates false negatives
+	def solve_adaptive_hqp2(self, variable_values, variable_dot_values, gamma_init = None):
+		opti = self.opti
+		self.time_taken = 0
+		gamma_init = [gamma_init]*(self.number_priorities-1)
+		hierarcy_failed = True
+		loop_counter = 0
+		hierarchy_failure = {}
+		while hierarcy_failed and loop_counter < 15:
+			loop_counter += 1
+			sol = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init)
+			if not sol:
+				return sol, hierarchy_failure
+			#check if the hierarchy fails
+			#compute the constraint Jacobian
+			Jg = sol.value(cs.jacobian(opti.g, opti.x))
+			#compute the gradient of the objective
+			Jf = sol.value(cs.jacobian(opti.f, opti.x))
+			#compute the Lagrange multipliers
+			lam_g = sol.value(opti.lam_g)
+			infeasible_constraints = {}
+
+			#Compute all the gradients of the constraints upto a priority level.
+			# Differentiated also between equality and inequality constraints
+			# (because the sign matters for the inequality constriants) 
+			eq_grad = {}
+			ineq_grad = {}
+			for i in range(0, self.number_priorities):
+				if i == 0:
+					eq_grad[i] = []
+					ineq_grad[i] = []
+				else:
+					eq_grad[i] = eq_grad[i-1]
+					ineq_grad[i] = ineq_grad[i-1]
+				constraint_type = self.constraint_type[i]
+				j = 0
+				for constraints_numbers in self.constraints_numbers[i]:
+					grad = Jf*0
+					for c in constraints_numbers:
+						grad += Jg[c]*lam_g[c]
+					grad = grad / (cs.norm_1(grad) + 1e-3)
+					if constraint_type[j] == 'equality':
+						eq_grad[i] = cs.vertcat(eq_grad[i], grad)
+					else:
+						ineq_grad[i] = cs.vertcat(ineq_grad[i], grad)
+					j += 1
+
+
+				#Find out which constriants are infeasible at each priority level
+				pl = self.number_priorities - i #starting from the lowest priority constraint
+				con_viols = sol.value(self.slacks[pl])
+				print(con_viols)
+				con_violated = con_viols >= 1e-7 #boolean array signifying which constraints are violated
+				print(con_violated)
+				con_violated = [j for j, s in enumerate(con_violated) if s]
+				infeasible_constraints[pl] = con_violated
+
+			print("Infeasible constriants are " + str(infeasible_constraints))
+			#Detect failure of hierarchy using the Lagrange multipliers
+			hierarchy_failure = {} #stores which constraint at which level failed
+			for pl in range(1, self.number_priorities):
+				# for c in infeasible_constraints[pl]:
+				if len(infeasible_constraints[pl]) > 0:
+					#compute the residual of gradient of Lagrangian
+					# grad = Jf*0
+					# for con in self.constraints_numbers[pl][c]:
+					# 	grad += Jg[con]*lam_g[con]
+					# grad = grad / (cs.norm_1(grad) + 1e-3)
+					# print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
+					# print("grad_i + g_infeasible : " + str(grad_i[pl] + g_infeasible[pl + 1]))
+
+					grad = Jf*0
+					for constraints_numbers in self.constraints_numbers[pl]:
+						for c2 in constraints_numbers:
+							grad += Jg[c2]*lam_g[c2]
+					grad = grad / (cs.norm_1(grad) + 1e-3)
+					print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
+
+					#Now creating a QP to check if the infeasibility can be caused solely by geq priority constraints
+					eq_con_mat = eq_grad[pl - 1]
+					ineq_con_mat = ineq_grad[pl - 1]
+					#Adding to these matrices, other constraints of the same priority level
+					# j = 0
+					# for constraints_numbers in self.constraints_numbers[pl]:
+					# 	if j != c:
+					# 		grad2 = Jf*0
+					# 		for c2 in constraints_numbers:
+					# 			grad2 += Jg[c2]*lam_g[c2]
+					# 		grad2 = grad2 / (cs.norm_1(grad2) + 1e-3)
+					# 		if constraint_type[j] == 'equality':
+					# 			eq_con_mat = cs.vertcat(eq_con_mat, grad2)
+					# 		else:
+					# 			ineq_con_mat = cs.vertcat(ineq_con_mat, grad2)
+					# 	j += 1
+					# print("Ineq_con_mat is " + str(ineq_con_mat))
+					# print("Eq_con_mat is " + str(eq_con_mat))
+					#setting up the QP
+					opti_ver = cs.Opti()
+					lam = opti_ver.variable(eq_con_mat.shape[0])
+					mu = opti_ver.variable(ineq_con_mat.shape[0])
+					proj = eq_con_mat.T@lam + ineq_con_mat.T@mu
+					n = self.variables_dot.shape[0]
+					# print("Variable dot length = " + str(n))
+					slack_ver = opti_ver.variable(n, 1)
+					opti_ver.subject_to(-slack_ver <= (proj[0:n,:] + grad[0:n].T <= slack_ver))
+					proj_err_orig = cs.DM.ones(1,n)@slack_ver
+					proj_err = proj_err_orig + cs.sumsqr(lam)*1e-10 + cs.DM.ones(mu.shape[0]).T@mu*1e-8
+					opti_ver.minimize(proj_err)
+					opti_ver.subject_to(mu >= 0)
+					blockPrint()
+					p_opts = {"expand":True}
+					s_opts = {"max_iter": 100, 'tol':1e-12}#, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5}
+					opti_ver.solver('ipopt', p_opts, s_opts)
+					# opti_ver.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': False, 'print_header': True, 'print_status': False, "print_time":True, 'max_iter': 1000})
+					# enablePrint()
+					sol_ver = opti_ver.solve()
+					blockPrint()
+					# enablePrint()
+					proj_err_sol = sol_ver.value(proj_err_orig)
+					print("Proj err sol is = " + str(proj_err_sol))
+
+					if proj_err_sol >= 1e-3:
+						hierarchy_failure[(pl, 0)] = True
+
+
+			# print(grad_i)
+			# print(g_infeasible)
+			print("Hierarchy failure is : " + str(hierarchy_failure))
+			if len(hierarchy_failure) == 0:
+				hierarcy_failed = False
+			else:
+				keys = hierarchy_failure.keys()
+				for k in keys:
+					gamma_init[k[0]-1] = 5*gamma_init[k[0]-1]
+		enablePrint()
+		print("Total time taken adaptive HQP2 = " + str(self.time_taken))
+		blockPrint()
 		return sol, hierarchy_failure
 
 # Disable
