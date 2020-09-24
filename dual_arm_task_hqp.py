@@ -88,6 +88,8 @@ if __name__ == '__main__':
 	traj2 = rob2_start_pose + cs.fmin(s_2, 1)*(rob2_end_pose - rob2_start_pose)
 
 	#Highest priority: Hard constraints on joint velocity and joint position limits
+	max_joint_vel = np.array([max_joint_vel])
+	max_joint_acc = np.array([max_joint_acc])
 	hqp.create_constraint(q_dot1, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
 	hqp.create_constraint(q_dot2, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
 	hqp.create_constraint(q1 + q_dot1*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
@@ -101,7 +103,7 @@ if __name__ == '__main__':
 	dist_ees = -cs.sqrt((fk_vals1[0:3,3] - fk_vals2[0:3, 3]).T@(fk_vals1[0:3,3] - fk_vals2[0:3, 3])) + 0.3
 	Jac_dist_con = cs.jacobian(dist_ees, cs.vertcat(q1, q2))
 	K_coll_avoid = 1
-	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2) + K_coll_avoid*dist_ees, 'ub', priority = 2, options = {'ub':0})
+	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2) + K_coll_avoid*dist_ees, 'ub', priority = 2, options = {'ub':np.zeros((1,1))})
 
 	#3rd highest priority. Stay on the path for both the robots
 	#for robot 1
@@ -153,7 +155,7 @@ if __name__ == '__main__':
 	q_dot_opt = cs.DM([0]*16)
 	q_dot_opt_history = q_dot_opt
 	hqp.configure()
-
+	hqp.time_taken = 0
 	tic = time.time()
 
 	constraint_violations = cs.DM([0, 0, 0, 0])
@@ -183,8 +185,8 @@ if __name__ == '__main__':
 	cool_off_counter = 0
 	for i in range(math.ceil(T/ts)):
 		counter += 1
-		sol = hqp.solve_HQPl1(q_opt, q_dot_opt)
-
+		# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
+		sol = hqp.solve_cascadedQP4(q_opt, q_dot_opt)
 		q_dot1_sol = sol.value(q_dot1)
 		q_dot2_sol = sol.value(q_dot2)
 		s_dot1_sol = sol.value(s_dot1)
