@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import math
 import time
 import matplotlib.pyplot as plt
-
+import json
 
 # import tkinter
 from pylab import *
@@ -88,8 +88,8 @@ if __name__ == '__main__':
 	traj2 = rob2_start_pose + cs.fmin(s_2, 1)*(rob2_end_pose - rob2_start_pose)
 
 	#Highest priority: Hard constraints on joint velocity and joint position limits
-	max_joint_vel = np.array([max_joint_vel])
-	max_joint_acc = np.array([max_joint_acc])
+	max_joint_vel = np.array([max_joint_vel]*7)
+	max_joint_acc = np.array([max_joint_acc]*7)
 	hqp.create_constraint(q_dot1, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
 	hqp.create_constraint(q_dot2, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
 	hqp.create_constraint(q1 + q_dot1*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
@@ -103,7 +103,7 @@ if __name__ == '__main__':
 	dist_ees = -cs.sqrt((fk_vals1[0:3,3] - fk_vals2[0:3, 3]).T@(fk_vals1[0:3,3] - fk_vals2[0:3, 3])) + 0.3
 	Jac_dist_con = cs.jacobian(dist_ees, cs.vertcat(q1, q2))
 	K_coll_avoid = 1
-	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2) + K_coll_avoid*dist_ees, 'ub', priority = 2, options = {'ub':np.zeros((1,1))})
+	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2) + K_coll_avoid*dist_ees, 'ub', priority = 1, options = {'ub':np.zeros((1,1))})
 
 	#3rd highest priority. Stay on the path for both the robots
 	#for robot 1
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
 	#5th priority: Second robot reaches the goal
 	s2_dot_rate_ff = 0.5
-	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
+	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 3)
 
 	#Adding bounds on the acceleration
 	# q_dot1_prev = opti.parameter(7, 1)
@@ -148,7 +148,7 @@ if __name__ == '__main__':
 	# max_iter_ls = 3
 	# qpsol_options = {'constr_viol_tol': kkt_tol_pr, 'dual_inf_tol': kkt_tol_du, 'verbose' : False, 'print_iter': False, 'print_header': False, 'dump_in': False, "error_on_fail" : False}
 	# solver_options = {'qpsol': 'qrqp', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
-	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
+	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
 
 	q_opt = cs.vertcat(cs.DM(q0_1), 0, cs.DM(q0_2), 0)
 	q_opt_history = q_opt
@@ -185,16 +185,47 @@ if __name__ == '__main__':
 	cool_off_counter = 0
 	for i in range(math.ceil(T/ts)):
 		counter += 1
-		# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
-		sol = hqp.solve_cascadedQP4(q_opt, q_dot_opt)
+		sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 		q_dot1_sol = sol.value(q_dot1)
 		q_dot2_sol = sol.value(q_dot2)
 		s_dot1_sol = sol.value(s_dot1)
 		s_dot2_sol = sol.value(s_dot2)
+		# print("\n\n Printing sol stats \n\n")
+		# print(sol.stats())
+
+		
+
+		# q_opt = q_opt.full()
+		# q_dot_opt = q_dot_opt.full()
+		# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
+		# sol_cqp, var_dot = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
+		# sol = sol_cqp[4]
+		# # print(var_dot.shape)
+		# # var_dot = chqp_optis[4][3]
+		# var_dot_sol = sol.value(var_dot)
+
+		# print("solution from chqp3")
+		# print(var_dot_sol)
+
+		# sol_cqp, chqp_optis = hqp.solve_cascadedQP4(q_opt, q_dot_opt)
+		# # sol_cqp, var_dot = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
+		# sol = sol_cqp[4]
+		# # print(var_dot.shape)
+		# var_dot = chqp_optis[4][3]
+		# var_dot_sol2 = sol.value(var_dot)
+
+		# print("solution from chqp4")
+		# print(var_dot_sol2)
+
+		# q_dot1_sol = var_dot_sol[0:7]
+		# q_dot2_sol = var_dot_sol[8:15]
+		# s_dot1_sol = var_dot_sol[7]
+		# s_dot2_sol = var_dot_sol[15]
+		
 
 		#Computing the constraint violations
-		con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
-		constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
+		# con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
+		# constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
 		# print(con_viols)
 		# print(q_opt)
 		# print(s2_opt)
@@ -210,10 +241,10 @@ if __name__ == '__main__':
 			if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
 				break
 
-		fk_vals1_sol = sol.value(fk_vals1)
-		fk_vals2_sol = sol.value(fk_vals2)
-		print(fk_vals1_sol)
-		print(fk_vals2_sol)
+		# fk_vals1_sol = sol.value(fk_vals1)
+		# fk_vals2_sol = sol.value(fk_vals2)
+		# print(fk_vals1_sol)
+		# print(fk_vals2_sol)
 
 		if visualizationBullet:
 			obj.setController(kukaID, "velocity", joint_indices, targetVelocities = q_dot1_sol)

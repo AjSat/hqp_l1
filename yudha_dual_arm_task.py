@@ -142,6 +142,7 @@ if __name__ == '__main__':
 
 	objective = slp3_gains.T@slack_priority3 + slp4_gains@slack_priority4 + slp2_gains.T@slack_priority2 + slp5_gains@slack_priority5
 	objective += 1e-3*(q_dot1.T@q_dot1) + 1e-3*(q_dot2.T@q_dot2) + 1e-3*(s_dot1*s_dot1 + s_dot2*s_dot2) 
+	opti.minimize(objective)
 	# slack_q_dot = opti.variable(7,1)
 	# opti.subject_to(-slack_q_dot <=  (q_dot1 <= slack_q_dot) )
 	# slack_q_dot2 = opti.variable(7,1)
@@ -151,15 +152,15 @@ if __name__ == '__main__':
 	# objective += cs.mtimes(cs.DM([1e-3]*7).T, slack_q_dot2)
 
 	#Adding bounds on the acceleration
-	q_dot1_prev = opti.parameter(7, 1)
-	opti.set_value(q_dot1_prev, cs.DM([0]*7))
-	opti.subject_to(-max_joint_acc*ts <= (q_dot1 - q_dot1_prev <= max_joint_acc*ts))
-	opti.minimize(objective)
+	# q_dot1_prev = opti.parameter(7, 1)
+	# opti.set_value(q_dot1_prev, cs.DM([0]*7))
+	# opti.subject_to(-max_joint_acc*ts <= (q_dot1 - q_dot1_prev <= max_joint_acc*ts))
+	
 
-	q_dot2_prev = opti.parameter(7, 1)
-	opti.set_value(q_dot2_prev, cs.DM([0]*7))
-	opti.subject_to(-max_joint_acc*ts <= (q_dot2 - q_dot2_prev <= max_joint_acc*ts))
-	opti.minimize(objective)
+	# q_dot2_prev = opti.parameter(7, 1)
+	# opti.set_value(q_dot2_prev, cs.DM([0]*7))
+	# opti.subject_to(-max_joint_acc*ts <= (q_dot2 - q_dot2_prev <= max_joint_acc*ts))
+	# opti.minimize(objective)
 
 	# #Adding the motion constraints
 	# c1 = J[0:2,:]@q_dot - cs.MX([0.1, 0.045])
@@ -329,8 +330,8 @@ if __name__ == '__main__':
 		opti.set_value(slp2_gains, alpha2)
 
 		#When bounds on acceleration
-		opti.set_value(q_dot1_prev, q_dot1_sol)
-		opti.set_value(q_dot2_prev, q_dot2_sol)
+		# opti.set_value(q_dot1_prev, q_dot1_sol)
+		# opti.set_value(q_dot2_prev, q_dot2_sol)
 	# 	opti.set_value(slg2, alpha2)
 	# 	opti.set_value(slg3, alpha3)
 		opti.set_initial(cs.vertcat(q_dot1, q_dot2), cs.vertcat(q_dot1_sol, q_dot2_sol))

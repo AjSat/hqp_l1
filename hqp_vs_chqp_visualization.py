@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pylab import *
 
 #Load the json data
-with open('/home/ajay/Desktop/hqp_l1/hqp_vs_chqp_results3(0.2).txt', 'r') as fp:
+with open('/home/ajay/Desktop/hqp_l1/hqp_vs_chqp_results_final.txt', 'r') as fp:
 	results = json.load(fp)
 
 #begin averaging the data
@@ -13,9 +13,10 @@ with open('/home/ajay/Desktop/hqp_l1/hqp_vs_chqp_results3(0.2).txt', 'r') as fp:
 # gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60, 100, 150, 200, 300, 400, 500]
 
 gamma_vals = [0.2,  1.0,  5.0]
-# gamma_vals = [0.1]
+gamma_vals = [0.2]
 # gamma_vals = [10.0, 20.0, 50.0]
 pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 # pl_vals = [3, 4, 5, 6, 7]
 #Creating an empty array for storing all parameters for different horizon sizes
 hierarchy_failed_average = {}
@@ -52,7 +53,7 @@ hqp_r = []
 chqp_r = []
 
 for p in pl_vals:
-	gamma = 0.1
+	gamma = 0.2
 	suc_rate.append(success_rate[(p, gamma)])
 	hqp_r.append(hqp_rate[(p, gamma)])
 	chqp_r.append(chqp_rate[p])

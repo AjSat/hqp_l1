@@ -42,9 +42,9 @@ def hqpvschqp(params):
 	adaptive_method = params['adaptive_method']#True
 
 	n_eq_per_level = int(total_eq_constraints / pl)
-	eq_first_level = n_eq_per_level + (total_eq_constraints - n_eq_per_level*pl)
+	eq_last_level = n_eq_per_level + (total_eq_constraints - n_eq_per_level*pl)
 	n_ineq_per_level = int(total_ineq_constraints / pl)
-	ineq_first_level = n_ineq_per_level + (total_ineq_constraints - n_ineq_per_level*pl)
+	ineq_last_level = n_ineq_per_level + (total_ineq_constraints - n_ineq_per_level*pl)
 	# print(n_eq_per_level)
 	# print(n_ineq_per_level)
 	# print(eq_first_level)
@@ -118,7 +118,7 @@ def hqpvschqp(params):
 	# print(row_ineqvec_norm)
 	for i in range(pl):
 
-		if i != 0:
+		if i != pl-1:
 			A_eq[i] = A_eq_all[counter_eq:counter_eq + n_eq_per_level, :]
 			b_eq[i] = b_eq_all[counter_eq:counter_eq + n_eq_per_level]
 			counter_eq += n_eq_per_level
@@ -132,16 +132,16 @@ def hqpvschqp(params):
 			hqp.create_constraint(A_ineq[i]@x_dot, 'lub', priority = i, options = {'lb':b_lower[i], 'ub':b_upper[i]})
 
 		else:
-			A_eq[i] = A_eq_all[0:eq_first_level, :]
-			b_eq[i] = b_eq_all[0:eq_first_level]
-			counter_eq += eq_first_level
+			A_eq[i] = A_eq_all[counter_ineq:counter_ineq + eq_last_level, :]
+			b_eq[i] = b_eq_all[counter_eq:counter_eq + eq_last_level]
+			counter_eq += eq_last_level
 			hqp.create_constraint(cs.mtimes(A_eq[i],x_dot) - b_eq[i], 'equality', priority = i)
 	
 
-			A_ineq[i] = A_ineq_all[0:ineq_first_level, :]
-			b_upper[i] = b_ineq_all[0:ineq_first_level]
-			counter_ineq += ineq_first_level
-			b_lower[i] = b_ineq_all_lower[0:ineq_first_level]
+			A_ineq[i] = A_ineq_all[counter_ineq:counter_ineq + ineq_last_level, :]
+			b_upper[i] = b_ineq_all[counter_ineq:counter_ineq + ineq_last_level]
+			b_lower[i] = b_ineq_all_lower[counter_ineq:counter_ineq + ineq_last_level]
+			counter_ineq += ineq_last_level
 			hqp.create_constraint(A_ineq[i]@x_dot, 'lub', priority = i, options = {'lb':b_lower[i], 'ub':b_upper[i]})
 
 	# print(A_eq)
@@ -158,7 +158,7 @@ def hqpvschqp(params):
 	# hqp.setup_cascadedQP()
 	
 	
-	sol_chqp = hqp.solve_cascadedQP3(params_init, [0]*n)
+	sol_chqp = hqp.solve_cascadedQP5(params_init, [0]*n)
 	enablePrint()
 	chqp_status = sol_chqp != False
 	result['chqp_status'] = chqp_status
@@ -341,14 +341,14 @@ if __name__ == "__main__":
 	params['total_ineq_constraints'] = total_ineq_constraints
 	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
 	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
-	gamma_vals = [0.1]
-	gamma_vals = [0.2]
-	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+	# gamma_vals = [0.1]
+	gamma_vals = [10]
+	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 	# gamma_vals = [10.0, 20.0, 50.0]
 	# pl_vals = [3, 4, 9, 10]
-	pl_vals = [4,]
-	gamma_vals = [10.0]
+	pl_vals = [6]
+	# gamma_vals = [10.0]
 	# pl_vals = [20]
 	results = {}
 
@@ -378,7 +378,7 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1050):
+			for rand_seed in range(1000, 1300):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
 				

@@ -7,16 +7,17 @@ from tasho import input_resolution
 from tasho import robot as rob
 import casadi as cs
 from casadi import pi, cos, sin
-from rockit import MultipleShooting, Ocp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 import time
 import matplotlib.pyplot as plt
 
+import copy
+
 hqp = hqp_p.hqp()
 
-n = 100
+n = 150
 pl = 25 #priority levels
 
 n_eq_per_level = 3
@@ -41,7 +42,7 @@ b_lower = {}
 params = x
 params_init = [0]*n
 #create these tasks
-np.random.seed(4)
+np.random.seed(451)
 for i in range(pl):
 	if i <= 100:
 		A_eq[i] = cs.DM(np.random.randn(n_eq_per_level, n))
@@ -71,16 +72,17 @@ for i in range(pl):
 	params_init = cs.vertcat(params_init, cs.vec(A_ineq[i]), b_upper[i])
 
 print(A_eq_opti[i])
-hqp.opti.set_value(A_eq_opti[1], A_eq[1])
+# hqp.opti.set_value(A_eq_opti[1], A_eq[1])
 # p_opts = {"expand":True}
-# s_opts = {"max_iter": 100, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
+# s_opts = {"max_iter": 100}#, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
 # hqp.opti.solver('ipopt', p_opts, s_opts)
 hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
 
 hqp.variables0 = params
 hqp.configure()
 
-
+# hqp.setup_cascadedQP()
+# hqp.solve_cascadedQP(params_init, [0]*n)
 sol = hqp.solve_HQPl1(params_init, [0]*n)
 
 x_dot_sol = sol.value(x_dot)
