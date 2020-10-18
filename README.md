@@ -1,7 +1,9 @@
 # Repository with source code for IEEE RA-L/ICRA submission:
 
 This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
-Unholy undocumented mess at the moment.
+
+
+Code unreadable at the moment.
 
 Refactoring and documentation coming soon!
 
