@@ -1,10 +1,15 @@
-# Repository with source code for solving hierarchical task specifications:
+# Repository with source code for IEEE RA-L/ICRA submission:
 
+This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
 Unholy undocumented mess at the moment.
 
 Refactoring and documentation coming soon!
 
+## A minor error in equation 11 that does not affect the rest of the paper
 
+There is minor error in equation 11 that does not affect the heuristic of the adaptive method nor the conclusions of the paper. The correction for this can be found below.
+
+[Correction](https://www.dropbox.com/s/prtiq1yv7mf0oo7/error.pdf?dl=0)
 
 ## Duality trick reformulation:
 
