@@ -19,15 +19,22 @@ import math
 import time
 import matplotlib.pyplot as plt
 import json
+import os
 
 # import tkinter
 from pylab import *
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
 
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
 
 if __name__ == '__main__':
 
 	
-	max_joint_acc = 90*3.14159/180
+	max_joint_acc = 900*3.14159/180
 	max_joint_vel = 30*3.14159/180
 	gamma = 1.4
 
@@ -95,6 +102,14 @@ if __name__ == '__main__':
 	hqp.create_constraint(q1 + q_dot1*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
 	hqp.create_constraint(q2 + q_dot2*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
 
+	#Adding bounds on the acceleration
+	q_dot1_prev = hqp.create_parameter(7)# hqp.opti.parameter(7, 1)
+	q_dot2_prev = hqp.create_parameter(7)#hqp.opti.parameter(7, 1)
+	# hqp.opti.set_value(q_dot1_prev, cs.DM([0]*7))
+	# hqp.opti.set_value(q_dot2_prev, cs.DM([0]*7))
+	hqp.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+	hqp.create_constraint(q_dot2 - q_dot2_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+
 	#2nd priority: Orientation constraints are fixed, And also the TODO: obstacle avoidance
 
 	# slack_priority2 = opti.variable(6, 1)
@@ -124,18 +139,8 @@ if __name__ == '__main__':
 
 	#5th priority: Second robot reaches the goal
 	s2_dot_rate_ff = 0.5
-	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 3)
+	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
 
-	#Adding bounds on the acceleration
-	# q_dot1_prev = opti.parameter(7, 1)
-	# opti.set_value(q_dot1_prev, cs.DM([0]*7))
-	# opti.subject_to(-max_joint_acc*ts <= (q_dot1 - q_dot1_prev <= max_joint_acc*ts))
-	# opti.minimize(objective)
-
-	# q_dot2_prev = opti.parameter(7, 1)
-	# opti.set_value(q_dot2_prev, cs.DM([0]*7))
-	# opti.subject_to(-max_joint_acc*ts <= (q_dot2 - q_dot2_prev <= max_joint_acc*ts))
-	# opti.minimize(objective)
 
 	p_opts = {"expand":True}
 
@@ -149,8 +154,9 @@ if __name__ == '__main__':
 	# qpsol_options = {'constr_viol_tol': kkt_tol_pr, 'dual_inf_tol': kkt_tol_du, 'verbose' : False, 'print_iter': False, 'print_header': False, 'dump_in': False, "error_on_fail" : False}
 	# solver_options = {'qpsol': 'qrqp', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
 	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
+	# hqp.opti.solver("ipopt", {"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
 
-	q_opt = cs.vertcat(cs.DM(q0_1), 0, cs.DM(q0_2), 0)
+	q_opt = cs.vertcat(cs.DM(q0_1), 0, cs.DM(q0_2), 0, cs.DM.zeros(14,1))
 	q_opt_history = q_opt
 	q_dot_opt = cs.DM([0]*16)
 	q_dot_opt_history = q_dot_opt
@@ -183,56 +189,61 @@ if __name__ == '__main__':
 		obj.physics_ts = ts
 
 	cool_off_counter = 0
+	comp_time = []
+	max_err = 0;
+	hqp.once_solved = False
+	no_times_exceeded = 0
 	for i in range(math.ceil(T/ts)):
 		counter += 1
-		sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
+		hqp.time_taken = 0
+		sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 50.0)
+		enablePrint()
+		print(hqp.time_taken)
+		comp_time.append(hqp.time_taken)
+		blockPrint()
 		q_dot1_sol = sol.value(q_dot1)
 		q_dot2_sol = sol.value(q_dot2)
 		s_dot1_sol = sol.value(s_dot1)
 		s_dot2_sol = sol.value(s_dot2)
-		# print("\n\n Printing sol stats \n\n")
-		# print(sol.stats())
+		con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
+		constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
 
-		
 
+		# sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
 		# q_opt = q_opt.full()
 		# q_dot_opt = q_dot_opt.full()
 		# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
-		# sol_cqp, var_dot = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
+		# sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
+		# # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 		# sol = sol_cqp[4]
 		# # print(var_dot.shape)
 		# # var_dot = chqp_optis[4][3]
-		# var_dot_sol = sol.value(var_dot)
-
-		# print("solution from chqp3")
-		# print(var_dot_sol)
-
-		# sol_cqp, chqp_optis = hqp.solve_cascadedQP4(q_opt, q_dot_opt)
-		# # sol_cqp, var_dot = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
-		# sol = sol_cqp[4]
-		# # print(var_dot.shape)
-		# var_dot = chqp_optis[4][3]
-		# var_dot_sol2 = sol.value(var_dot)
-
-		# print("solution from chqp4")
-		# print(var_dot_sol2)
-
+		# var_dot_sol = sol.value(hqp.cHQP_xdot[4])
+		# # enablePrint()
+		# # # print(hqp.time_taken)
+		# # comp_time.append(hqp.time_taken)
+		# # blockPrint()
 		# q_dot1_sol = var_dot_sol[0:7]
 		# q_dot2_sol = var_dot_sol[8:15]
 		# s_dot1_sol = var_dot_sol[7]
 		# s_dot2_sol = var_dot_sol[15]
-		
 
+		# sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 1.5)
+		# max_err = cs.fmax(max_err, cs.norm_1(sol_h.value(cs.vertcat(q_dot1, s_dot1, q_dot2, s_dot2)) - var_dot_sol))
+		# enablePrint()
+		# print(max_err)
+		# if cs.norm_1(sol_h.value(cs.vertcat(q_dot1, s_dot1, q_dot2, s_dot2)) - var_dot_sol) >= 1e-4:
+		# 	no_times_exceeded += 1
+		# blockPrint()
 		#Computing the constraint violations
-		# con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
-		# constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
+		
 		# print(con_viols)
 		# print(q_opt)
 		# print(s2_opt)
 
 		#Update all the variables
 		q_dot_opt = cs.vertcat(q_dot1_sol, s_dot1_sol, q_dot2_sol, s_dot2_sol)
-		q_opt += ts*q_dot_opt
+		q_opt[0:16] += ts*q_dot_opt
 
 		s1_opt = q_opt[7]
 		if s1_opt >=1:
@@ -269,8 +280,12 @@ if __name__ == '__main__':
 
 
 		#When bounds on acceleration
-		# opti.set_value(q_dot1_prev, q_dot1_sol)
-		# opti.set_value(q_dot2_prev, q_dot2_sol)
+		q_opt = cs.vertcat(q_opt[0:16], q_dot1_sol, q_dot2_sol)
+		# q_opt[16:23] =  q_dot1_sol#hqp.opti.set_value(q_dot1_prev, q_dot1_sol)
+		# q_opt[23:30] = q_dot2_sol #hqp.opti.set_value(q_dot2_prev, q_dot2_sol)
+
+	enablePrint()
+	print("No of times exceeded   !" + str(no_times_exceeded))
 	if visualizationBullet:
 		obj.end_simulation()
 
@@ -292,13 +307,19 @@ if __name__ == '__main__':
 	xlabel("Time step (Control sampling time = 0.005s)")
 	legend()
 
-	figure()
-	plot(list(range(counter-1)), q_dot_opt_history.full().T)
-	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
-	# # 
-	title("Trajectory")
-	xlabel("No of samples in the horizon (sampling time = 0.05s)")
-	ylabel('Seconds')
+	# figure()
+	# plot(list(range(counter-1)), q_dot_opt_history.full().T)
+	# # # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# # # 
+	# title("joint_velocities")
+	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	# ylabel('rad/s')
+
+	# figure()
+	# plot(list(range(counter-1)), q_opt_history.full().T)
+	# title("joint_positions")
+	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	# ylabel('rad')
 	
 
 	# figure()
@@ -309,5 +330,13 @@ if __name__ == '__main__':
 	# plot(list(range(201)), x_dot[4,:].full().T, label = 'w_y')
 	# plot(list(range(201)), x_dot[5,:].full().T, label = 'w_z')
 	# legend()
-	print(sol.value(hqp.opti.lam_g))
+	# print(sol.value(hqp.opti.lam_g))
+
+	temp = {'comp_time':comp_time, 'q_traj':q_opt_history.full().tolist(), 'q_dot_traj':q_dot_opt_history.full().tolist()}
+	with open('../hqp_l1/comp_time.txt', 'w') as fp:
+		json.dump(temp, fp)
+
 	show(block=True)
+
+
+

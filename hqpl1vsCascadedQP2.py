@@ -67,6 +67,7 @@ def hqpvschqp(params):
 	A_eq_all = cs.vertcat(A_eq_all, A_extra)
 	A_eq_all = A_eq_all.full()
 	np.random.shuffle(A_eq_all)
+	A_eq_all += np.random.randn(total_eq_constraints, n)*1e-5
 	b_eq_all = np.random.randn(total_eq_constraints)
 	#normalizing the each row vector
 	row_vec_norm = []
@@ -180,7 +181,7 @@ def hqpvschqp(params):
 		print("Time taken by the non-adaptive method = " + str(hqp.time_taken))
 	else:
 		# tic = time.time()
-		sol, hierarchical_failure = hqp.solve_adaptive_hqp(params_init, [0]*n, gamma_init = gamma)
+		sol, hierarchical_failure = hqp.solve_adaptive_hqp2(params_init, [0]*n, gamma_init = gamma)
 		# toc = time.time() - tic
 		tp = 0 #true positive
 		fp = 0
@@ -329,10 +330,10 @@ def hqpvschqp(params):
 if __name__ == "__main__":
 
 	n = 25
-	total_eq_constraints = 25
-	eq_con_rank = 15
-	total_ineq_constraints = 25
-	ineq_con_rank = 15
+	total_eq_constraints = 40
+	eq_con_rank = 25
+	total_ineq_constraints = 40
+	ineq_con_rank = 25
 	params = {}
 	params['n'] = n
 	params['eq_con_rank'] = eq_con_rank
@@ -342,12 +343,12 @@ if __name__ == "__main__":
 	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
 	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 	# gamma_vals = [0.1]
-	gamma_vals = [10]
+	gamma_vals = [0.2]
 	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 	# gamma_vals = [10.0, 20.0, 50.0]
 	# pl_vals = [3, 4, 9, 10]
-	pl_vals = [6]
+	pl_vals = [3]
 	# gamma_vals = [10.0]
 	# pl_vals = [20]
 	results = {}
@@ -378,7 +379,7 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1300):
+			for rand_seed in range(1000, 1005):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
 				

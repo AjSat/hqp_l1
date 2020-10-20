@@ -38,7 +38,9 @@ class hqp:
 		self.constraint_counter = 0
 		self.cHQP_optis = {}
 		self.cHQP_slacks = {}
-
+		self.once_solved = False
+		self.chqp_warm_start_x = {}
+		self.chqp_warm_start_lam = {}
 	def activate_cascadedHQP(priority_levels):
 		""" Should be activated before creating any variables or adding any constraints"""
 		cHQP = []
@@ -60,6 +62,13 @@ class hqp:
 		self.obj += weight*cs.sumsqr(var_dot)
 
 		return var0, var_dot
+
+	def create_parameter(self, size, weight = 0):
+
+		opti = self.opti
+		var0 = opti.parameter(size, 1)
+		self.variables0 = cs.vertcat(self.variables0, var0)
+		return var0
 
 	def set_value(self, var, val):
 		self.opti.set_value(var, val)
@@ -457,11 +466,13 @@ class hqp:
 		enablePrint()
 		return sol_cqp
 
-	def solve_cascadedQP5(self, variable_values, variable_dot_values, solver = 'qpoases'):
+	def solve_cascadedQP5(self, variable_values, variable_dot_values, solver = 'qpoases', warm_start = False):
 		blockPrint()
 		sol_cqp = {}
 		gain = 1 #just set some value for the L1 penalty on task constraints
 		number_priorities = len(self.slacks)
+		chqp_warm_start_x = self.chqp_warm_start_x
+		chqp_warm_start_lam = self.chqp_warm_start_lam
 		self.time_taken = 0
 		self.cHQP_xdot = {}
 		casc_QP_slack_sols = {}
@@ -500,7 +511,7 @@ class hqp:
 					constraint_type = self.constraint_type[j]
 					constraint_options_ub = self.constraint_options_ub[j]
 					constraint_options_lb = self.constraint_options_lb[j]
-					constraints_sol = casc_QP_slack_sols[j]
+					constraints_sol = cs.DM(casc_QP_slack_sols[j])
 					slacks_now = opti.variable(constraint_expression.shape[0], 1)
 					opti.subject_to(slacks_now >= 0)
 					#check if the constraint is active and make it a hard constraint
@@ -545,7 +556,10 @@ class hqp:
 					weight = gain/cs.norm_1(constraints[j, :])
 					obj += weight*slacks_now[j]
 
-				opti.minimize(obj + cs.sumsqr(variables_dot)*1e-6)
+				if priority == number_priorities:
+					opti.minimize(obj + cs.sumsqr(variables_dot)*1e-6) #sufficient to add regularization only at the last level
+				else:
+					opti.minimize(obj)
 
 			#solve the QP for this priority level
 			# print(opti.p.shape)
@@ -558,9 +572,15 @@ class hqp:
 				opti.solver("ipopt",{"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
 			tic = time.time()
 			# sol = opti.solve()
+			if warm_start and self.once_solved:
+				opti.set_initial(opti.x, chqp_warm_start_x[priority])
+				opti.set_initial(opti.lam_g, chqp_warm_start_lam[priority])
 			try:
-				
+
 				sol = opti.solve()
+				if warm_start:
+					chqp_warm_start_x[priority] = sol.value(opti.x)
+					chqp_warm_start_lam[priority] = sol.value(opti.lam_g)
 				self.time_taken += sol.stats()['t_wall_total']#time.time() - tic
 				if priority >= 1:
 					casc_QP_slack_sols[priority] = sol.value(slacks_now)
@@ -572,6 +592,7 @@ class hqp:
 			# cHQP[priority] = opti
 			sol_cqp[priority] = sol
 		enablePrint()
+		self.once_solved = True
 		return sol_cqp
 
 	def solve_cascadedQP_L2(self, variable_values, variable_dot_values, solver = 'qpoases'):
@@ -887,6 +908,7 @@ class hqp:
 		tic = time.time()
 		# sol = opti.solve()
 		try:
+			# opti.minimize(opti.f) #to prevent warmstart. REMOVE!!!!
 			sol = opti.solve()
 			self.time_taken += sol.stats()['t_wall_total'] # toc
 			tewosdlkjf = 1
