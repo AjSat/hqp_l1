@@ -1,17 +1,12 @@
 # Code containing all the routines for L1-HQP
 
 import sys, os
-from tasho import task_prototype_rockit as tp
-from tasho import input_resolution
-from tasho import robot as rob
 import casadi as cs
 from casadi import pi, cos, sin
-from rockit import MultipleShooting, Ocp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 import time
-import matplotlib.pyplot as plt
 # import tkinter
 from pylab import *
 import copy

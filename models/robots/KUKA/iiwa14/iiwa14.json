@@ -1,0 +1,63 @@
+{
+    "name": "iiwa14",
+    "n_dof": "7",
+    "n_joints": "8",
+    "n_q": "7",
+    "n_frames": "23",
+    "gravity": {
+        "x": "0",
+        "y": "0",
+        "z": "-9.8100000000000005"
+    },
+    "joints": {
+        "iiwa_joint_1": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.9670597283900002",
+            "joint_pos_lb": "-2.9670597283900002",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_2": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.09439510239",
+            "joint_pos_lb": "-2.09439510239",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_3": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.9670597283900002",
+            "joint_pos_lb": "-2.9670597283900002",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_4": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.09439510239",
+            "joint_pos_lb": "-2.09439510239",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_5": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.9670597283900002",
+            "joint_pos_lb": "-2.9670597283900002",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_6": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "2.09439510239",
+            "joint_pos_lb": "-2.09439510239",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        },
+        "iiwa_joint_7": {
+            "joint_types": "JointModelRZ",
+            "joint_pos_ub": "3.0543261909899999",
+            "joint_pos_lb": "-3.0543261909899999",
+            "joint_torque_limit": "300",
+            "joint_vel_limit": "10"
+        }
+    }
+}

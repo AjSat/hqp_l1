@@ -5,19 +5,15 @@
 #So, it is L1 vs QP vs augmented PI (with nullspace projection)
 
 import sys
-sys.path.insert(0, "/home/ajay/Desktop/hqp_l1")
+# sys.path.insert(0, "/home/ajay/Desktop/hqp_l1")
 from hqp import  hqp
-from tasho import task_prototype_rockit as tp
-from tasho import input_resolution
-from tasho import robot as rob
+import robot as rob
 import casadi as cs
 from casadi import pi, cos, sin
-from rockit import MultipleShooting, Ocp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 import time
-import matplotlib.pyplot as plt
 import json
 import os
 
@@ -171,7 +167,7 @@ if __name__ == '__main__':
 	counter = 1
 	if visualizationBullet:
 
-		from tasho import world_simulator
+		import world_simulator
 		import pybullet as p
 
 		obj = world_simulator.world_simulator()

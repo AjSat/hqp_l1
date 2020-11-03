@@ -3,15 +3,11 @@
 # Jacobians
 
 import sys, os
-sys.path.insert(0, "/home/ajay/Desktop/hqp_l1")
+# sys.path.insert(0, "/home/ajay/Desktop/hqp_l1")
 import  hqp as hqp_p
-from tasho import task_prototype_rockit as tp
-from tasho import input_resolution
-from tasho import robot as rob
 import casadi as cs
 from casadi import pi, cos, sin
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 import time
 import matplotlib.pyplot as plt
@@ -449,6 +445,6 @@ if __name__ == "__main__":
 				hf_heuristic = {'tp':count_tp, 'tn':count_tn, 'fn':count_fn, 'fp':count_fp}
 				results[str(pl) + ',' + str(gamma)] = [count_hierarchy_failue, count_identical_solution, count_same_constraints, count_geq_constraints, total_trials, count_lex_con_norm, count_hqp_heuristic_pred, hf_heuristic, chqp_time_arr, hqp_time_arr]
 	print(results)
-	with open('../hqp_l1/hqp_vs_chqp_results.txt', 'w') as fp:
+	with open('./hqp_vs_chqp_results.txt', 'w') as fp:
 		json.dump(results, fp)
 
