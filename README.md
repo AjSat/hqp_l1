@@ -1,11 +1,8 @@
-# Repository with source code for IEEE RA-L/ICRA submission:
+# Repository with source code for IEEE RA-L/ICRA submission
 
 This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
 
-
-Code unreadable at the moment.
-
-Refactoring and documentation coming soon!
+Documentation coming soon to improve readability of the code.
 
 ## A minor error in equation 11 that does not affect the rest of the paper
 
@@ -22,3 +19,30 @@ There is also an undocumented implementation of the duality trick also for hiera
 https://yalmip.github.io/
 
 https://www.gurobi.com/downloads/gurobi-optimizer-eula/
+
+## Weighted and sequential methods 
+
+The code for this part includes the following dependencies:
+
+* **Python3.5** or above
+
+* **CasADi** - A toolbox used for automatic differentiation of the task functions and as the interface to optimization solvers. Can be installed by
+```
+pip3 install casadi
+```
+* **PyBullet** - If one chooses to simulate and visualize the robot motion. Can be installed by:
+
+```
+pip3 install pybullet
+```
+
+
+The weighted and sequential problems with L1 norm penalty are implemented in Python using Casadi in the **hqp.py** file. Within this file:
+
+* hqp.solve_cascadedQP5() - Is the implementation of the sequential method.
+* solve_HQPl1() is the implementation of the weighted method.
+* solve_adaptive_hqp2() is the implementation of the adaptive weighted method.
+
+
+
+
