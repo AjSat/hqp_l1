@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import json
 import casadi as cs
 import numpy as np
-from tasho.utils import geometry
+import geometry
 
 #TODO: If input resolution has already been set for a previous task, you don't need to set it again
 
