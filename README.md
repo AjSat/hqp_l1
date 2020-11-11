@@ -2,6 +2,10 @@
 
 This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
 
+## Video of the experiment in paper
+
+![Algorithm implemented for a dual arm control task](videos/dual_arm_collavoid.gif)
+
 Documentation coming soon to improve readability of the code.
 
 ## A minor error in equation 11 that does not affect the rest of the paper
