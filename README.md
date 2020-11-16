@@ -1,12 +1,23 @@
-# Repository with source code for IEEE RA-L/ICRA submission
+# Repository for weighted method for strictly hierarchical linear programming with applications to robot control
+
+### Using L1 norm as a regularization step can allow for sparse or parsimonious control of the robot system.
+### Specifying constraint violations using L1 norm leads to sparse constraint violations
+
 
 This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
+Documentation coming soon to improve readability of the code.
 
 ## Video of the experiment in paper
 
 ![Algorithm implemented for a dual arm control task](videos/dual_arm_collavoid.gif)
 
-Documentation coming soon to improve readability of the code.
+## Timing comparison of different methods for solving the hierarchical linear program
+
+![timing graphs](videos/timing_comparison.png)
+
+The weighted method is significantly faster than the sequential method as only one optimization problem is solved per iteration. But it does not provide any guarantees of lexicographic optimality if the correct weights are not chosen. Hence an adaptive method is devised which monitors the constraints that are violated. If there is a change in the violated constraints or a jump in these violations, a warm-started sequential method is implemented at that particular level to verify the lexicographic optimality. If found to be violated, weights are adapted.
+
+The adaptive method was found to be computationally slighly more expensive but finds feasible weights automatically.
 
 ## A minor error in equation 11 that does not affect the rest of the paper
 
@@ -46,7 +57,7 @@ The weighted and sequential problems with L1 norm penalty are implemented in Pyt
 * hqp.solve_cascadedQP5() - Is the implementation of the sequential method.
 * solve_HQPl1() is the implementation of the weighted method.
 * solve_adaptive_hqp2() is the implementation of the adaptive weighted method.
-
+* solve_adaptive_hqp3() is a newly implemented adaptive method whose verification of lexicographic optimality is exact because simply the corresponding sequential method is used.
 
 
 

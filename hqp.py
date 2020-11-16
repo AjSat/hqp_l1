@@ -205,6 +205,14 @@ class hqp:
 			self.constraint_expression_funs[i] = cs.Function('cons' + str(i), [self.variables0, self.variables_dot], [self.constraints[i]])
 		self.opti.minimize(self.obj)
 
+		self.inf_but_optimal = {}
+		self.constraints_violated = {}
+		for i in range(1, self.number_priorities+1):
+			self.inf_but_optimal[i] = []
+			self.constraints_violated[i] = 0
+
+		self.gamma_initialized = False
+
 	def setup_cascadedQP(self):
 		number_priorities = len(self.slacks)
 		opti = self.opti
@@ -862,7 +870,7 @@ class hqp:
 			
 
 
-	def solve_HQPl1(self, variable_values, variable_dot_values, gamma_init = None):
+	def solve_HQPl1(self, variable_values, variable_dot_values, gamma_init = None, gamma_limit = None):
 
 		opti = self.opti
 		opti.set_value(self.variables0, variable_values)
@@ -896,6 +904,10 @@ class hqp:
 					cumulative_weight += weight*cs.norm_1(constraints[j, :])
 					# print("weight at priority_level " + str(priority) + " is " + str(weight))
 					opti.set_value(self.slack_weights[priority][j], weight)
+
+		if gamma_limit != None:
+			for i in range(gamma_limit, self.number_priorities):
+				opti.set_value(self.slack_weights[i+1], 0)
 		# opti.minimize(opti.f) #TODOOO: remove, added just to eliminate warm start
 		print("Cumulative weight is " + str(cumulative_weight))
 		blockPrint()
@@ -1059,7 +1071,7 @@ class hqp:
 			ineq_grad = {}
 			# enablePrint()
 			for i in range(0, self.number_priorities):
-				print("Priority level " + str(i))
+				# print("Priority level " + str(i))
 				if i == 0:
 					eq_grad[i] = []
 					ineq_grad[i] = []
@@ -1075,23 +1087,23 @@ class hqp:
 					grad = grad / (cs.norm_1(grad) + 1e-3)
 					if constraint_type[j] == 'equality':
 						eq_grad[i] = cs.vertcat(eq_grad[i], grad)
-						print(eq_grad)
+						# print(eq_grad)
 					else:
 						ineq_grad[i] = cs.vertcat(ineq_grad[i], grad)
-						print(ineq_grad)
+						# print(ineq_grad)
 					j += 1
 
 				#Find out which constriants are infeasible at each priority level
 				pl = self.number_priorities - i #starting from the lowest priority constraint
 				con_viols = sol.value(self.slacks[pl])
-				print(con_viols)
+				# print(con_viols)
 				con_violated = con_viols >= 1e-7 #boolean array signifying which constraints are violated
-				print(con_violated)
+				# print(con_violated)
 				con_violated = [j for j, s in enumerate(con_violated) if s]
 				infeasible_constraints[pl] = con_violated
-			print("Printting the first eq_grad")
-			print(eq_grad[0])
-			print("Infeasible constriants are " + str(infeasible_constraints))
+			# print("Printting the first eq_grad")
+			# print(eq_grad[0])
+			# print("Infeasible constriants are " + str(infeasible_constraints))
 			#Detect failure of hierarchy using the Lagrange multipliers
 			hierarchy_failure = {} #stores which constraint at which level failed
 			for pl in range(1, self.number_priorities):
@@ -1150,7 +1162,7 @@ class hqp:
 					# 	j += 1
 
 					grad = grad / (cs.norm_1(grad) + 1e-3)
-					print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
+					# print("Gradient of the constraint" + str((pl, c)) + ":" + str(grad))
 
 					#Now creating a QP to check if the infeasibility can be caused solely by geq priority constraints
 					eq_con_mat = eq_grad[pl - 1]
@@ -1228,8 +1240,109 @@ class hqp:
 		blockPrint()
 		return sol, hierarchy_failure
 
+	#simply solve the sequential step with appropriate warm starting
+	def solve_adaptive_hqp3(self, variable_values, variable_dot_values, gamma_init = None, iter_lim = 5):
+		opti = self.opti
+		self.time_taken = 0
+		if not self.gamma_initialized:
+			gamma_init = [gamma_init]*(self.number_priorities-1)
+			self.gamma_initialized = True
+			self.gamma_init = gamma_init
+		else:
+			gamma_init = self.gamma_init
+		
+		hierarcy_failed = True
+		once_ran = False
+		loop_counter = 0
+		hierarchy_failure = {}
+		infeasible_constraints = {}
+		constraint_violations = {}
+		while hierarcy_failed and loop_counter < iter_lim:
+			enablePrint()
+			loop_counter += 1
+			print("loop counter is " + str(loop_counter))
+			blockPrint()
+			sol = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init)
+			if not sol:
+				if once_ran:
+					return sol_old, hierarchy_failure
+				else:
+					return sol, hierarchy_failure
+			else:
+				once_ran = True
+				sol_old = sol
+			#check if the hierarchy fails
+			variable_dot_values = sol.value(self.variables_dot)
+
+			for i in range(0, self.number_priorities):
+				# print("Priority level " + str(i))
+
+				#Find out which constriants are infeasible at each priority level
+				pl = self.number_priorities - i #starting from the lowest priority constraint
+				con_viols = sol.value(self.slacks[pl])
+				# print(con_viols)
+				con_violated = con_viols >= 1e-4 #boolean array signifying which constraints are violated
+				
+				if not isinstance(con_violated, np.ndarray):
+					print(type(con_violated))
+					con_violated = [con_violated]
+				print(con_violated)
+				con_violated = [j for j, s in enumerate(con_violated) if s]
+				infeasible_constraints[pl] = con_violated
+				constraint_violations[pl] = con_viols
+
+			hierarchy_failure = {} #stores which constraint at which level failed
+			for pl in range(1, self.number_priorities+1):
+				# for c in infeasible_constraints[pl]:
+				if len(infeasible_constraints[pl]) > 0:
+
+					#if the violated constraints differ from infeasible but optimal constraints
+					if not infeasible_constraints[pl] == self.inf_but_optimal[pl] or cs.norm_1(constraint_violations[pl])/(cs.norm_1(self.constraints_violated[pl]) + 1e-3) >= 2.0:
+						print("pl level " + str(pl))
+						print("Constraint violations from weighted")
+						print(constraint_violations[pl])
+						gamma_temp = copy.deepcopy(gamma_init)
+						for p in range(pl + 1, self.number_priorities):
+							gamma_temp[p-1] = 0 #set all the weights for lower priority constraints to zero
+						print(gamma_temp)
+						# sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_temp)
+						sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init, gamma_limit = pl)
+						con_viol_test = np.array(sol_test.value(self.slacks[pl]))
+						print("constraint violations from test")
+						print(con_viol_test)
+						con_violated = con_viol_test >= 1e-4 #boolean array signifying which constraints are violated
+						if not isinstance(con_violated, np.ndarray):
+							print(type(con_violated))
+							con_violated = [con_violated]
+						print(con_violated)
+						con_violated = [j for j, s in enumerate(con_violated) if s]
+
+						if cs.norm_1(constraint_violations[pl] - con_viol_test) <= 1e-5:
+							self.inf_but_optimal[pl] = infeasible_constraints[pl]
+							self.constraints_violated[pl] = constraint_violations[pl]
+						else:
+							gamma_init[pl-1] = 5*gamma_init[pl-1]
+							self.gamma_init = gamma_init
+							hierarchy_failure[pl] = True
+							break
+
+				else:
+					self.inf_but_optimal[pl] = infeasible_constraints[pl]
+					self.constraints_violated[pl] = constraint_violations[pl]
+
+			if len(hierarchy_failure) == 0:
+				hierarcy_failed = False
+			print("Hierarchy failure is : " + str(hierarchy_failure))
+
+		enablePrint()
+		print(gamma_init)
+		print("Total time taken adaptive HQP2 = " + str(self.time_taken))
+		blockPrint()
+		return sol, hierarchy_failure
+
 # Disable
 def blockPrint():
+	# sys.stdout = sys.__stdout__
     sys.stdout = open(os.devnull, 'w')
 
 # Restore

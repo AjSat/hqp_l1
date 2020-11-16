@@ -30,8 +30,8 @@ def enablePrint():
 if __name__ == '__main__':
 
 	
-	max_joint_acc = 900*3.14159/180
-	max_joint_vel = 30*3.14159/180
+	max_joint_acc = 150*3.14159/180
+	max_joint_vel = 50*3.14159/180
 	gamma = 1.4
 
 	robot = rob.Robot('iiwa7')
@@ -58,20 +58,20 @@ if __name__ == '__main__':
 	hqp = hqp()
 
 	#decision variables for robot 1
-	q1, q_dot1 = hqp.create_variable(7, 1e-1)
+	q1, q_dot1 = hqp.create_variable(7, 1e-6)
 	J1 = jac_fun_rob(q1)
 	J1 = cs.vertcat(J1[0], J1[1])
 	#progress variable for robot 1
-	s_1, s_dot1 = hqp.create_variable(1, 1e-1)
+	s_1, s_dot1 = hqp.create_variable(1, 1e-6)
 
 	fk_vals1 = robot.fk(q1)[6] #forward kinematics first robot
 
 	#decision variables for robot 2
-	q2, q_dot2 = hqp.create_variable(7, 1e-1)
+	q2, q_dot2 = hqp.create_variable(7, 1e-6)
 	J2 = jac_fun_rob(q2)
 	J2 = cs.vertcat(J2[0], J2[1])
 	#progress variables for robot 2
-	s_2, s_dot2 = hqp.create_variable(1, 1e-3)
+	s_2, s_dot2 = hqp.create_variable(1, 1e-6)
 
 	fk_vals2 = robot.fk(q2)[6] #forward kinematics second robot
 	fk_vals2[1,3] += 0.3 #accounting for the base offset in the y-direction
@@ -183,15 +183,19 @@ if __name__ == '__main__':
 		obj.resetJointState(kukaID, joint_indices, q0_1)
 		obj.resetJointState(kukaID2, joint_indices, q0_2)
 		obj.physics_ts = ts
-
+	
+	# time.sleep(5)
 	cool_off_counter = 0
 	comp_time = []
 	max_err = 0;
 	hqp.once_solved = False
 	no_times_exceeded = 0
+	# sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
+	comp_time.append(hqp.time_taken)
 	for i in range(math.ceil(T/ts)):
 		counter += 1
 		hqp.time_taken = 0
+		# sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 1	)
 		sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 50.0)
 		enablePrint()
 		print(hqp.time_taken)
@@ -205,20 +209,20 @@ if __name__ == '__main__':
 		constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
 
 
-		# sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
+		#sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
 		# q_opt = q_opt.full()
 		# q_dot_opt = q_dot_opt.full()
 		# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
 		# sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-		# # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
+		# # # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 		# sol = sol_cqp[4]
-		# # print(var_dot.shape)
-		# # var_dot = chqp_optis[4][3]
+		# # # print(var_dot.shape)
+		# # # var_dot = chqp_optis[4][3]
 		# var_dot_sol = sol.value(hqp.cHQP_xdot[4])
-		# # enablePrint()
-		# # # print(hqp.time_taken)
-		# # comp_time.append(hqp.time_taken)
-		# # blockPrint()
+		# enablePrint()
+		# print(hqp.time_taken)
+		# # # comp_time.append(hqp.time_taken)
+		# # # blockPrint()
 		# q_dot1_sol = var_dot_sol[0:7]
 		# q_dot2_sol = var_dot_sol[8:15]
 		# s_dot1_sol = var_dot_sol[7]
@@ -303,13 +307,21 @@ if __name__ == '__main__':
 	xlabel("Time step (Control sampling time = 0.005s)")
 	legend()
 
-	# figure()
-	# plot(list(range(counter-1)), q_dot_opt_history.full().T)
-	# # # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
-	# # # 
-	# title("joint_velocities")
-	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
-	# ylabel('rad/s')
+	figure()
+	plot(list(range(counter-1)), q_dot_opt_history.full().T)
+	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# # 
+	title("joint_velocities")
+	xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	ylabel('rad/s')
+
+	figure()
+	semilogy(list(range(counter)), comp_time)
+	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# # 
+	title("Computation times")
+	xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	ylabel('Time (s)')
 
 	# figure()
 	# plot(list(range(counter-1)), q_opt_history.full().T)
