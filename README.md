@@ -1,4 +1,4 @@
-# Repository for weighted method for strictly hierarchical linear programming with applications to robot control
+# Repository for weighted method for strictly hierarchical parametric linear programming with applications to robot control
 
 ### Using L1 norm as a regularization step can allow for sparse or parsimonious control of the robot system.
 ### Specifying constraint violations using L1 norm leads to sparse constraint violations
