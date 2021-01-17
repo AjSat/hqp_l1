@@ -21,15 +21,15 @@ import os
 from pylab import *
 # Disable
 def blockPrint():
-    sys.stdout = open(os.devnull, 'w')
+	sys.stdout = open(os.devnull, 'w')
 
 # Restore
 def enablePrint():
-    sys.stdout = sys.__stdout__
+	sys.stdout = sys.__stdout__
 
 if __name__ == '__main__':
 
-	
+
 	max_joint_acc = 150*3.14159/180
 	max_joint_vel = 50*3.14159/180
 	gamma = 1.4
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	robot.set_joint_velocity_limits(lb = -max_joint_vel, ub = max_joint_vel)
 	robot.set_joint_torque_limits(lb = -100, ub = 100)
 
-	#creating a second robot arm 
+	#creating a second robot arm
 	robot2 = rob.Robot('iiwa7')
 	robot2.set_joint_acceleration_limits(lb = -max_joint_acc, ub = max_joint_acc)
 	robot2.set_joint_velocity_limits(lb = -max_joint_vel, ub = max_joint_vel)
@@ -137,6 +137,8 @@ if __name__ == '__main__':
 	s2_dot_rate_ff = 0.5
 	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
 
+	hqp.create_constraint(q_dot1, 'equality', priority = 4)
+	hqp.create_constraint(q_dot2, 'equality', priority = 4)
 
 	p_opts = {"expand":True}
 
@@ -183,20 +185,20 @@ if __name__ == '__main__':
 		obj.resetJointState(kukaID, joint_indices, q0_1)
 		obj.resetJointState(kukaID2, joint_indices, q0_2)
 		obj.physics_ts = ts
-	
+
 	# time.sleep(5)
 	cool_off_counter = 0
 	comp_time = []
 	max_err = 0;
 	hqp.once_solved = False
 	no_times_exceeded = 0
-	# sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
+	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
 	comp_time.append(hqp.time_taken)
 	for i in range(math.ceil(T/ts)):
 		counter += 1
 		hqp.time_taken = 0
-		# sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 1	)
-		sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 50.0)
+		sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 5)
+		# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 50.0)
 		enablePrint()
 		print(hqp.time_taken)
 		comp_time.append(hqp.time_taken)
@@ -236,7 +238,7 @@ if __name__ == '__main__':
 		# 	no_times_exceeded += 1
 		# blockPrint()
 		#Computing the constraint violations
-		
+
 		# print(con_viols)
 		# print(q_opt)
 		# print(s2_opt)
@@ -310,7 +312,7 @@ if __name__ == '__main__':
 	figure()
 	plot(list(range(counter-1)), q_dot_opt_history.full().T)
 	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
-	# # 
+	# #
 	title("joint_velocities")
 	xlabel("No of samples in the horizon (sampling time = 0.05s)")
 	ylabel('rad/s')
@@ -318,7 +320,7 @@ if __name__ == '__main__':
 	figure()
 	semilogy(list(range(counter)), comp_time)
 	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
-	# # 
+	# #
 	title("Computation times")
 	xlabel("No of samples in the horizon (sampling time = 0.05s)")
 	ylabel('Time (s)')
@@ -328,7 +330,7 @@ if __name__ == '__main__':
 	# title("joint_positions")
 	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
 	# ylabel('rad')
-	
+
 
 	# figure()
 	# plot(list(range(201)), x_dot[0,:].full().T, label = 'x')
@@ -345,6 +347,3 @@ if __name__ == '__main__':
 		json.dump(temp, fp)
 
 	show(block=True)
-
-
-

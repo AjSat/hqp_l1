@@ -57,7 +57,7 @@ def hqpvschqp(params):
 	np.random.seed(rand_seed) #for 45, 1, 8 HQP-l1 does not agree with the cHQP 
 	#15, 18, 11 for 8 priority levels
 	
-	x, x_dot = hqp.create_variable(n, 1e-6)
+	x, x_dot = hqp.create_variable(n, 1e-12)
 	A_eq_all = cs.DM(np.random.randn(params['eq_con_rank'], n))
 	A_extra = (A_eq_all.T@cs.DM(np.random.randn(params['eq_con_rank'], total_eq_constraints - params['eq_con_rank']))).T
 	A_eq_all = cs.vertcat(A_eq_all, A_extra)
@@ -177,7 +177,7 @@ def hqpvschqp(params):
 		print("Time taken by the non-adaptive method = " + str(hqp.time_taken))
 	else:
 		# tic = time.time()
-		sol, hierarchical_failure = hqp.solve_adaptive_hqp2(params_init, [0]*n, gamma_init = gamma)
+		sol, hierarchical_failure = hqp.solve_adaptive_hqp3(params_init, [0]*n, gamma_init = gamma)
 		# toc = time.time() - tic
 		tp = 0 #true positive
 		fp = 0
@@ -325,11 +325,11 @@ def hqpvschqp(params):
 
 if __name__ == "__main__":
 
-	n = 25
-	total_eq_constraints = 40
-	eq_con_rank = 25
-	total_ineq_constraints = 40
-	ineq_con_rank = 25
+	n = 30
+	total_eq_constraints = 15
+	eq_con_rank = 5
+	total_ineq_constraints = 15
+	ineq_con_rank = 5
 	params = {}
 	params['n'] = n
 	params['eq_con_rank'] = eq_con_rank
@@ -344,7 +344,7 @@ if __name__ == "__main__":
 
 	# gamma_vals = [10.0, 20.0, 50.0]
 	# pl_vals = [3, 4, 9, 10]
-	pl_vals = [3]
+	pl_vals = [6]
 	# gamma_vals = [10.0]
 	# pl_vals = [20]
 	results = {}
@@ -375,7 +375,7 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1005):
+			for rand_seed in range(1000, 1050):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
 				

@@ -2,7 +2,7 @@
 #between the two arms
 
 import sys
-from hqp import  hqp
+from lexopt_mosek import  lexopt_mosek
 import robot as rob
 import casadi as cs
 from casadi import pi, cos, sin
@@ -28,7 +28,6 @@ if __name__ == '__main__':
 
 	max_joint_acc = 150*3.14159/180
 	max_joint_vel = 50*3.14159/180
-	gamma = 1.4
 
 	robot = rob.Robot('iiwa7')
 	robot.set_joint_acceleration_limits(lb = -max_joint_acc, ub = max_joint_acc)
@@ -51,29 +50,30 @@ if __name__ == '__main__':
 
 	#Implementing with my L1 norm method
 
-	hqp = hqp()
+	hlp = lexopt_mosek()
 
-	regularization = 1e-6*0
+	max_joint_vel = np.array([max_joint_vel]*7)
+	max_joint_acc = np.array([max_joint_acc]*7)
+
 	#decision variables for robot 1
-	q1, q_dot1 = hqp.create_variable(7, regularization)
+	q1, q_dot1 = hlp.create_variable(7, -max_joint_vel, max_joint_vel)
+	q2, q_dot2 = hlp.create_variable(7, -max_joint_vel, max_joint_vel)
+	s_1, s_dot1 = hlp.create_variable(1, cs.vertcat(-1), cs.vertcat(1))
+	s_2, s_dot2 = hlp.create_variable(1, cs.vertcat(-1), cs.vertcat(1))
+	q_torso, q_torso_dot = hlp.create_variable(1, cs.vertcat(-1), cs.vertcat(1))
+
 	J1 = jac_fun_rob(q1)
 	J1 = cs.vertcat(J1[0], J1[1])
 	#progress variable for robot 1
-	s_1, s_dot1 = hqp.create_variable(1, regularization)
 
 	fk_vals1 = robot.fk(q1)[6] #forward kinematics first robot
 
 	#decision variables for robot 2
-	q2, q_dot2 = hqp.create_variable(7, regularization)
 	J2 = jac_fun_rob(q2)
 	J2 = cs.vertcat(J2[0], J2[1])
-	#progress variables for robot 2
-	s_2, s_dot2 = hqp.create_variable(1, regularization)
 
 	fk_vals2 = robot.fk(q2)[6] #forward kinematics second robot
 
-	#Add a torso joint to kinematically couple the two arms
-	q_torso, q_torso_dot = hqp.create_variable(1, regularization)
 	#The centre of the revolute joint is at y = 0.15
 	R_torso = cs.vertcat(cs.horzcat(cos(q_torso), sin(q_torso), 0), cs.horzcat(-sin(q_torso), cos(q_torso), 0), cs.horzcat(0, 0, 1))
 	t_left = cs.vertcat(0.15*sin(q_torso), -0.15*cos(q_torso) + 0.15, 0)
@@ -101,61 +101,57 @@ if __name__ == '__main__':
 	traj2 = rob2_start_pose + cs.fmin(s_2, 1)*(rob2_end_pose - rob2_start_pose)
 
 	#Highest priority: Hard constraints on joint velocity and joint position limits
-	max_joint_vel = np.array([max_joint_vel]*7)
-	max_joint_acc = np.array([max_joint_acc]*7)
-	hqp.create_constraint(q_dot1, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
-	hqp.create_constraint(q_dot2, 'lub', priority = 0, options = {'lb':-max_joint_vel, 'ub':max_joint_vel})
-	hqp.create_constraint(q_torso_dot, 'lub', priority = 0, options = {'lb':np.array([-max_joint_vel[0]]), 'ub':np.array([max_joint_vel[0]])})
-	# hqp.create_constraint(q1 + q_dot1*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
-	# hqp.create_constraint(q2 + q_dot2*ts, 'lub', priority = 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
+	# hlp.create_constraint(q1 + q_dot1*ts, 'lub', 0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
+	# hlp.create_constraint(q2 + q_dot2*ts, 'lub',  0, options = {'lb':robot.joint_lb, 'ub':robot.joint_ub})
+	hlp.create_constraint(s_1 + s_dot1*ts, 'lub',  0, options = {'lb':0, 'ub':1})
+	hlp.create_constraint(s_2 + s_dot2*ts, 'lub',  0, options = {'lb':0, 'ub':1})
 
 	#Adding bounds on the acceleration
-	q_dot1_prev = hqp.create_parameter(7)# hqp.opti.parameter(7, 1)
-	q_dot2_prev = hqp.create_parameter(7)#hqp.opti.parameter(7, 1)
-	q_torso_dot_prev = hqp.create_parameter(1)#hqp.opti.parameter(7, 1)
-	# hqp.opti.set_value(q_dot1_prev, cs.DM([0]*7))
-	# hqp.opti.set_value(q_dot2_prev, cs.DM([0]*7))
-	# hqp.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
-	# hqp.create_constraint(q_dot2 - q_dot2_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
-	# hqp.create_constraint(q_torso_dot - q_torso_dot_prev, 'lub', priority = 0, options = {'lb':np.array([-max_joint_acc[0]*ts]), 'ub':np.array([max_joint_acc[0]*ts])})
+	q_dot1_prev = hlp.create_parameter(7)# hqp.opti.parameter(7, 1)
+	q_dot2_prev = hlp.create_parameter(7)#hqp.opti.parameter(7, 1)
+	q_torso_dot_prev = hlp.create_parameter(1)#hqp.opti.parameter(7, 1)
+
+	hlp.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+	hlp.create_constraint(q_dot2 - q_dot2_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+	hlp.create_constraint(q_torso_dot - q_torso_dot_prev, 'lub', priority = 0, options = {'lb':np.array([-max_joint_acc[0]*ts]), 'ub':np.array([max_joint_acc[0]*ts])})
 
 	#2nd priority: Orientation constraints are fixed, And also the TODO: obstacle avoidance
 
 	# slack_priority2 = opti.variable(6, 1)
-	hqp.create_constraint(cs.vertcat(J1[3:5, :]@q_dot1, J2[3:5, :]@q_dot2), 'equality', priority = 1)
+	hlp.create_constraint(cs.vertcat(J1[3:5, :]@q_dot1, J2[3:5, :]@q_dot2), 'eq', 1, {'b':cs.vcat([0,0,0,0])})
 
 	dist_ees = -cs.sqrt((fk_vals1[0:3,3] - fk_vals2[0:3, 3]).T@(fk_vals1[0:3,3] - fk_vals2[0:3, 3])) + 0.3
 	Jac_dist_con = cs.jacobian(dist_ees, cs.vertcat(q1, q2, q_torso))
-	K_coll_avoid = 1
-	hqp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2, q_torso_dot) + K_coll_avoid*dist_ees, 'ub', priority =1, options = {'ub':np.zeros((1,1))})
+	K_coll_avoid = 5
+	hlp.create_constraint(Jac_dist_con@cs.vertcat(q_dot1, q_dot2, q_torso_dot) + K_coll_avoid*dist_ees, 'ub', 1, {'ub':0})
 
 	#3rd highest priority. Stay on the path for both the robots
 	#for robot 1
 	stay_path1 = fk_vals1[0:3, 3] - traj1
 	K_stay_path1 = 1
 	Jac_sp1 = cs.jacobian(stay_path1, cs.vertcat(q1, s_1, q_torso))
-	hqp.create_constraint(Jac_sp1@cs.vertcat(q_dot1, s_dot1, q_torso_dot) + K_stay_path1*stay_path1, 'equality', priority = 2)
+	hlp.create_constraint(Jac_sp1@cs.vertcat(q_dot1, s_dot1, q_torso_dot) + K_stay_path1*stay_path1, 'eq', 2, {"b":cs.vcat([0,0,0])})
 
 	#for robot 2
 	stay_path2 = fk_vals2[0:3, 3] - traj2
 	K_stay_path2 = 1
 	Jac_sp2 = cs.jacobian(stay_path2, cs.vertcat(q2, s_2, q_torso))
-	hqp.create_constraint(Jac_sp2@cs.vertcat(q_dot2, s_dot2, q_torso_dot) + K_stay_path2*stay_path2, 'equality', priority = 2)
+	hlp.create_constraint(Jac_sp2@cs.vertcat(q_dot2, s_dot2, q_torso_dot) + K_stay_path2*stay_path2, 'eq', 2, {"b":cs.vcat([0,0,0])})
 
 	#4th priority: First robot reaches the goal
 	s1_dot_rate_ff = 0.25
-	hqp.create_constraint(s_dot1 - s1_dot_rate_ff, 'equality', priority = 3)
+	hlp.create_constraint(s_dot1 - s1_dot_rate_ff, 'eq', 3, {'b':0.0})
 
 	#5th priority: Second robot reaches the goal
 	s2_dot_rate_ff = 0.5
-	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
+	hlp.create_constraint(s_dot2 - s2_dot_rate_ff, 'eq', 4, {'b':0.0})
 
-	hqp.create_constraint(q_dot1, 'equality', priority = 5)
-	hqp.create_constraint(q_dot2, 'equality', priority = 5)
-	hqp.create_constraint(q_torso_dot, 'equality', priority = 5)
-	hqp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'equality', priority = 5)
+	hlp.create_constraint(q_dot1, 'eq', 5, {"b":cs.vcat([0,0,0,0,0,0,0])})
+	hlp.create_constraint(q_dot2, 'eq', 5, {"b":cs.vcat([0,0,0,0,0,0,0])})
+	hlp.create_constraint(q_torso_dot, 'eq', 5, {"b":cs.vcat([0])})
+	hlp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'eq', 5, {"b":cs.vcat([0, 0])})
 
-	p_opts = {"expand":True}
+	hlp.configure_constraints()
 
 	# # s_opts = {"max_iter": 100, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
 
@@ -166,15 +162,16 @@ if __name__ == '__main__':
 	# max_iter_ls = 3
 	# qpsol_options = {'constr_viol_tol': kkt_tol_pr, 'dual_inf_tol': kkt_tol_du, 'verbose' : False, 'print_iter': False, 'print_header': False, 'dump_in': False, "error_on_fail" : False}
 	# solver_options = {'qpsol': 'qrqp', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
-	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
+	# hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
 	# hqp.opti.solver("ipopt", {"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
 
-	q_opt = cs.vertcat(cs.DM(q0_1), 0, cs.DM(q0_2), 0, 0, cs.DM.zeros(15,1))
+	q_opt = cs.vertcat(cs.DM(q0_1), cs.DM(q0_2), 0, 0, 0, cs.DM.zeros(15,1))
 	q_opt_history = q_opt
 	q_dot_opt = cs.DM([0]*17)
 	q_dot_opt_history = q_dot_opt
-	hqp.configure()
-	hqp.time_taken = 0
+	hlp.compute_matrices(cs.DM([0]*17), q_opt)
+	hlp.configure_weighted_problem()
+	# hqp.time_taken = 0
 	tic = time.time()
 
 	constraint_violations = cs.DM([0, 0, 0, 0])
@@ -204,32 +201,47 @@ if __name__ == '__main__':
 	# time.sleep(5)
 	cool_off_counter = 0
 	comp_time = []
+	simplex_iters = []
 	max_err = 0;
-	hqp.once_solved = False
+	# hqp.once_solved = False
 	no_times_exceeded = 0
-	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
-	comp_time.append(hqp.time_taken)
+	hlp.solve_weighted_method([10,5,2,1,0.01])
+	print("Optimal q_dot = " + str(hlp.Mw_dict['x'].level()) )
+	comp_time.append(hlp.Mw.getSolverDoubleInfo("simTime"))
+	simplex_iters.append(hlp.Mw.getSolverIntInfo("simPrimalIter"))
+	print("First solve time is = " + str(hlp.Mw.getSolverDoubleInfo("simTime")))
 
 	sequential_method = False
-	for i in range(math.ceil(T/ts)):
+	for i in range(1000): #range(math.ceil(T/ts)):
 		counter += 1
-		hqp.time_taken = 0
-
+		# hqp.time_taken = 0
+		print("iter :" + str(i))
+		print(hlp.Mw_dict[4]['eq_b'].getValue())
 		if not sequential_method:
-			sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 5)
+			hlp.solve_weighted_method([20000,5000,50,0.1*10,0.001])
+			var_dot_sol = hlp.Mw_dict['x'].level()
 			# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
-			q_dot1_sol = sol.value(q_dot1)
-			q_dot2_sol = sol.value(q_dot2)
-			s_dot1_sol = sol.value(s_dot1)
-			s_dot2_sol = sol.value(s_dot2)
-			q_torso_dot_sol = sol.value(q_torso_dot)
-			con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
-			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
-			enablePrint()
-			print(hqp.time_taken)
-			print("q_torso_dot = "+str(q_torso_dot_sol))
-			comp_time.append(hqp.time_taken)
-			blockPrint()
+			q_dot1_sol = var_dot_sol[0:7]
+			q_dot2_sol = var_dot_sol[7:14]
+			s_dot1_sol = var_dot_sol[14]
+			s_dot2_sol = var_dot_sol[15]
+			q_torso_dot_sol = var_dot_sol[16]
+
+			con_viol1 = cs.norm_1(hlp.Mw_dict[1]['eq_slack'].level()) + cs.norm_1(hlp.Mw_dict[1]['ub_slack'].level())
+			con_viol2 = cs.norm_1(hlp.Mw_dict[2]['eq_slack'].level())
+			con_viol3 = cs.norm_1(hlp.Mw_dict[3]['eq_slack'].level())
+			con_viol4 = cs.norm_1(hlp.Mw_dict[4]['eq_slack'].level())
+			# con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
+			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(con_viol1, con_viol2, con_viol3, con_viol4))
+			# enablePrint()
+			# sol_time = hlp.Mw.getSolverDoubleInfo("optimizerTime")
+			sol_time = hlp.Mw.getSolverDoubleInfo("simPrimalTime") + hlp.Mw.getSolverDoubleInfo("simDualTime")
+			simplex_iters.append(hlp.Mw.getSolverIntInfo("simPrimalIter") + hlp.Mw.getSolverIntInfo("simDualIter"))
+			print("Solver time is = " + str(sol_time))
+			# print("Solver time is = " + str(hlp.Mw.getSolverDoubleInfo("simTime")))
+			# print("q_torso_dot = "+str(q_torso_dot_sol))
+			comp_time.append(sol_time)
+			# blockPrint()
 
 
 		#sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
@@ -267,16 +279,16 @@ if __name__ == '__main__':
 		# print(s2_opt)
 
 		#Update all the variables
-		q_dot_opt = cs.vertcat(q_dot1_sol, s_dot1_sol, q_dot2_sol, s_dot2_sol, q_torso_dot_sol)
+		q_dot_opt = cs.vertcat(q_dot1_sol, q_dot2_sol, s_dot1_sol,  s_dot2_sol, q_torso_dot_sol)
 		q_opt[0:17] += ts*q_dot_opt
 
-		s1_opt = q_opt[7]
+		s1_opt = q_opt[14]
 		if s1_opt >=1:
 			print("Robot1 reached it's goal. Terminating")
 			cool_off_counter += 1
 			# break
-			if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
-				break
+			# if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
+				# break
 
 		# fk_vals1_sol = sol.value(fk_vals1)
 		# fk_vals2_sol = sol.value(fk_vals2)
@@ -307,6 +319,7 @@ if __name__ == '__main__':
 
 		#When bounds on acceleration
 		q_opt = cs.vertcat(q_opt[0:17], q_dot1_sol, q_dot2_sol, q_torso_dot_sol)
+		hlp.compute_matrices(cs.DM([0]*17), q_opt)
 		# q_opt[16:23] =  q_dot1_sol#hqp.opti.set_value(q_dot1_prev, q_dot1_sol)
 		# q_opt[23:30] = q_dot2_sol #hqp.opti.set_value(q_dot2_prev, q_dot2_sol)
 
@@ -334,7 +347,7 @@ if __name__ == '__main__':
 	legend()
 
 	figure()
-	plot(list(range(counter-1)), q_dot_opt_history.full().T)
+	plot(list(range(counter)), q_dot_opt_history.full().T)
 	# plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
 	# #
 	title("joint_velocities")
@@ -346,6 +359,14 @@ if __name__ == '__main__':
 	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
 	# #
 	title("Computation times")
+	xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	ylabel('Time (s)')
+
+	figure()
+	plot(list(range(counter)), simplex_iters)
+	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# #
+	title("Number of simplex iterations")
 	xlabel("No of samples in the horizon (sampling time = 0.05s)")
 	ylabel('Time (s)')
 

@@ -56,7 +56,7 @@ class lexopt_mosek:
 
 		constraints = self.constraints[priority]
 		A = cs.jacobian(expression, self.variables_dot)
-
+		a0 = expression
 		if ctype == 'lub':
 
 			if 'lub' not in constraints:
@@ -66,8 +66,8 @@ class lexopt_mosek:
 				constraints['lub']['ub'] = []
 
 			constraints['lub']['A'] = cs.vertcat(constraints['lub']['A'], A)
-			constraints['lub']['ub'] = cs.vertcat(constraints['lub']['ub'], options['ub'])
-			constraints['lub']['lb'] = cs.vertcat(constraints['lub']['lb'], options['lb'])
+			constraints['lub']['ub'] = cs.vertcat(constraints['lub']['ub'], options['ub'] - a0)
+			constraints['lub']['lb'] = cs.vertcat(constraints['lub']['lb'], options['lb']- a0)
 
 		elif ctype == 'ub':
 
@@ -77,7 +77,7 @@ class lexopt_mosek:
 				constraints['ub']['ub'] = []
 
 			constraints['ub']['A'] = cs.vertcat(constraints['ub']['A'], A)
-			constraints['ub']['ub'] = cs.vertcat(constraints['ub']['ub'], options['ub'])
+			constraints['ub']['ub'] = cs.vertcat(constraints['ub']['ub'], options['ub']- a0)
 
 		elif ctype == 'eq':
 
@@ -87,7 +87,7 @@ class lexopt_mosek:
 				constraints['eq']['b'] = []
 
 			constraints['eq']['A'] = cs.vertcat(constraints['eq']['A'], A)
-			constraints['eq']['b'] = cs.vertcat(constraints['eq']['b'], options['b'])
+			constraints['eq']['b'] = cs.vertcat(constraints['eq']['b'], options['b']- a0)
 
 		else:
 			raise Exception("Unknown constraint type added")
@@ -124,17 +124,45 @@ class lexopt_mosek:
 			constraints = self.constraints[priority]
 
 			if 'lub' in constraints:
-				constraints['lub']['A_vals'] = constraints['lub']['A_fun'](variables_dot, variables0).full()
-				constraints['lub']['lb_vals'] = constraints['lub']['lb_fun'](variables_dot, variables0).full()
-				constraints['lub']['ub_vals'] = constraints['lub']['ub_fun'](variables_dot, variables0).full()
+				A_vals = constraints['lub']['A_fun'](variables_dot, variables0)
+				lb_vals = constraints['lub']['lb_fun'](variables_dot, variables0)
+				ub_vals = constraints['lub']['ub_fun'](variables_dot, variables0)
+				for i in range(A_vals.shape[0]):
+					row_vec_norm = cs.norm_1(A_vals[i,:])
+					lb_vals[i] /= row_vec_norm
+					ub_vals[i] /= row_vec_norm
+					for j in range(A_vals.shape[1]):
+						A_vals[i,j] /= row_vec_norm
+
+				constraints['lub']['A_vals'] = A_vals.full()
+				constraints['lub']['lb_vals'] = lb_vals.full().ravel()
+				constraints['lub']['ub_vals'] = ub_vals.full().ravel()
 
 			if 'ub' in constraints:
-				constraints['ub']['A_vals'] = constraints['ub']['A_fun'](variables_dot, variables0).full()
-				constraints['ub']['ub_vals'] = constraints['ub']['ub_fun'](variables_dot, variables0).full()
+
+				A_vals = constraints['ub']['A_fun'](variables_dot, variables0)
+				ub_vals = constraints['ub']['ub_fun'](variables_dot, variables0)
+				for i in range(A_vals.shape[0]):
+					row_vec_norm = cs.norm_1(A_vals[i,:])
+					ub_vals[i] /= row_vec_norm
+					for j in range(A_vals.shape[1]):
+						A_vals[i,j] /= row_vec_norm
+
+				constraints['ub']['A_vals'] = A_vals.full()
+				constraints['ub']['ub_vals'] = ub_vals.full().ravel()
 
 			if 'eq' in constraints:
-				constraints['eq']['A_vals'] = constraints['eq']['A_fun'](variables_dot,variables0).full()
-				constraints['eq']['b_vals'] = constraints['eq']['b_fun'](variables_dot, variables0).full()
+
+				A_vals = constraints['eq']['A_fun'](variables_dot, variables0)
+				b_vals = constraints['eq']['b_fun'](variables_dot, variables0)
+				for i in range(A_vals.shape[0]):
+					row_vec_norm = cs.norm_1(A_vals[i,:])
+					b_vals[i] /= row_vec_norm
+					for j in range(A_vals.shape[1]):
+						A_vals[i,j] /= row_vec_norm
+
+				constraints['eq']['A_vals'] = A_vals.full()
+				constraints['eq']['b_vals'] = b_vals.full().ravel()
 
 	def configure_weighted_problem(self):
 
@@ -147,45 +175,55 @@ class lexopt_mosek:
 
 			constraints = self.constraints[priority]
 			Mw_dict[priority] = {}
+			if priority >= 1:
+				if 'lub' in constraints:
+					m = constraints['lub']['A_vals'].shape[0]
+					Mw_dict[priority]['lub_slack'] = Mw.variable(str(priority)+"_w_lub_slack", m, Domain.greaterThan(0.0))
+					Mw_dict[priority]['lub_slack_weight'] =  Mw.parameter(str(priority)+"_w_lub_slack_weight", m)
+					Mw_dict[priority]['lub_ub'] = Mw.parameter(str(priority)+"_lub_ub", m)
+					Mw_dict[priority]['lub_lb'] = Mw.parameter(str(priority)+"_lub_lb", m)
+					Mw_dict[priority]['lub_A'] = Mw.parameter(str(priority)+"_lub_A", [m, self.n])
+					Mw.constraint(str(priority)+"_lub_con1", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_ub']), Mw_dict[priority]['lub_slack']), Domain.lessThan(0))
+					Mw.constraint(str(priority)+"_lub_con2", Expr.add(Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_lb']), Mw_dict[priority]['lub_slack']), Domain.greaterThan(0))
+					obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['lub_slack'],Mw_dict[priority]['lub_slack_weight']))
 
-			if 'lub' in constraints:
-				m = constraints['lub']['A_vals'].shape[0]
-				Mw_dict[priority]['lub_slack'] = Mw.variable(str(priority)+"_w_lub_slack", m, Domain.greaterThan(0.0))
-				Mw_dict[priority]['lub_slack_weight'] =  Mw.parameter(str(priority)+"_w_lub_slack_weight", m)
-				Mw_dict[priority]['lub_ub'] = Mw.parameter(str(priority)+"_lub_ub", m)
-				Mw_dict[priority]['lub_lb'] = Mw.parameter(str(priority)+"_lub_lb", m)
-				Mw_dict[priority]['lub_A'] = Mw.parameter(str(priority)+"_lub_A", [m, self.n])
-				Mw.constraint(str(priority)+"_lub_con1", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_ub']), Mw_dict[priority]['lub_slack']), Domain.lessThan(0))
-				Mw.constraint(str(priority)+"_lub_con2", Expr.add(Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_lb']), Mw_dict[priority]['lub_slack']), Domain.greaterThan(0))
-				obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['lub_slack'],Mw_dict[priority]['lub_slack_weight']))
+				if 'ub' in constraints:
+					m = constraints['ub']['A_vals'].shape[0]
+					Mw_dict[priority]['ub_slack'] = Mw.variable(str(priority)+"_w_ub_slack", m, Domain.greaterThan(0.0))
+					Mw_dict[priority]['ub_slack_weight'] =  Mw.parameter(str(priority)+"_w_ub_slack_weight", m)
+					Mw_dict[priority]['ub_ub'] = Mw.parameter(str(priority)+"_ub_ub", m)
+					Mw_dict[priority]['ub_A'] = Mw.parameter(str(priority)+"_ub_A", [m, self.n])
+					Mw.constraint(str(priority)+"_ub_con", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['ub_A'], x), Mw_dict[priority]['ub_ub']), Mw_dict[priority]['ub_slack']), Domain.lessThan(0))
+					obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['ub_slack'],Mw_dict[priority]['ub_slack_weight']))
 
-			if 'ub' in constraints:
-				m = constraints['ub']['A_vals'].shape[0]
-				Mw_dict[priority]['ub_slack'] = Mw.variable(str(priority)+"_w_ub_slack", m, Domain.greaterThan(0.0))
-				Mw_dict[priority]['ub_slack_weight'] =  Mw.parameter(str(priority)+"_w_ub_slack_weight", m)
-				Mw_dict[priority]['ub_ub'] = Mw.parameter(str(priority)+"_ub_ub", m)
-				Mw_dict[priority]['ub_A'] = Mw.parameter(str(priority)+"_ub_A", [m, self.n])
-				Mw.constraint(str(priority)+"_ub_con", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['ub_A'], x), Mw_dict[priority]['ub_ub']), Mw_dict[priority]['ub_slack']), Domain.lessThan(0))
-				obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['ub_slack'],Mw_dict[priority]['ub_slack_weight']))
+				if 'eq' in constraints:
+					m = constraints['eq']['A_vals'].shape[0]
+					Mw_dict[priority]['eq_slack'] = Mw.variable(str(priority)+"_w_eq_slack", m, Domain.greaterThan(0.0))
+					Mw_dict[priority]['eq_slack_weight'] =  Mw.parameter(str(priority)+"_w_eq_slack_weight", m)
+					Mw_dict[priority]['eq_b'] = Mw.parameter(str(priority)+"_eq_b", m)
+					Mw_dict[priority]['eq_A'] = Mw.parameter(str(priority)+"_eq_A", [m, self.n])
+					Mw_dict[priority][str(priority)+"_eq_con1"] = Mw.constraint(str(priority)+"_eq_con1", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['eq_A'], x), Mw_dict[priority]['eq_b']), Mw_dict[priority]['eq_slack']), Domain.lessThan(0))
+					Mw_dict[priority][str(priority)+"_eq_con2"] = Mw.constraint(str(priority)+"_eq_con2", Expr.add(Expr.sub(Expr.mul(Mw_dict[priority]['eq_A'], x), Mw_dict[priority]['eq_b']), Mw_dict[priority]['eq_slack']), Domain.greaterThan(0))
+					obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['eq_slack'],Mw_dict[priority]['eq_slack_weight']))
 
-			if 'eq' in constraints:
-				m = constraints['eq']['A_vals'].shape[0]
-				Mw_dict[priority]['eq_slack'] = Mw.variable(str(priority)+"_w_eq_slack", m, Domain.greaterThan(0.0))
-				Mw_dict[priority]['eq_slack_weight'] =  Mw.parameter(str(priority)+"_w_eq_slack_weight", m)
-				Mw_dict[priority]['eq_b'] = Mw.parameter(str(priority)+"_eq_b", m)
-				Mw_dict[priority]['eq_A'] = Mw.parameter(str(priority)+"_eq_A", [m, self.n])
-				Mw.constraint(str(priority)+"_eq_con1", Expr.sub(Expr.sub(Expr.mul(Mw_dict[priority]['eq_A'], x), Mw_dict[priority]['eq_b']), Mw_dict[priority]['eq_slack']), Domain.lessThan(0))
-				Mw.constraint(str(priority)+"_eq_con2", Expr.add(Expr.sub(Expr.mul(Mw_dict[priority]['eq_A'], x), Mw_dict[priority]['eq_b']), Mw_dict[priority]['eq_slack']), Domain.greaterThan(0))
-				obj = Expr.add(obj, Expr.dot(Mw_dict[priority]['eq_slack'],Mw_dict[priority]['eq_slack_weight']))
+			if priority == 0:
+				if 'lub' in constraints:
+					m = constraints['lub']['A_vals'].shape[0]
+					Mw_dict[priority]['lub_ub'] = Mw.parameter(str(priority)+"_lub_ub", m)
+					Mw_dict[priority]['lub_lb'] = Mw.parameter(str(priority)+"_lub_lb", m)
+					Mw_dict[priority]['lub_A'] = Mw.parameter(str(priority)+"_lub_A", [m, self.n])
+					Mw.constraint(str(priority)+"_lub_con1", Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_ub']), Domain.lessThan(0))
+					Mw.constraint(str(priority)+"_lub_con2", Expr.sub(Expr.mul(Mw_dict[priority]['lub_A'], x), Mw_dict[priority]['lub_lb']), Domain.greaterThan(0))
 
 		Mw.objective(ObjectiveSense.Minimize, obj)
-		Mw.setSolverParam('optimizer', 'primalSimplex')
-		Mw.setSolverParam("numThreads", 1)
+		Mw.setSolverParam('optimizer', 'freeSimplex')
+		Mw.setSolverParam("numThreads", 4)
 		Mw.setSolverParam('simHotstart', 'statusKeys')
 		Mw.setSolverParam("basisRelTolS", 1.0e-4)
 		Mw.setSolverParam("simDegen", "none")
 		Mw.setSolverParam("simNonSingular", "off")
 		Mw.setSolverParam("presolveUse", "off")
+		Mw.breakSolver()
 		self.Mw = Mw
 		self.Mw_dict = Mw_dict
 
@@ -193,28 +231,31 @@ class lexopt_mosek:
 	def solve_weighted_method(self, weights):
 
 		#set values
-		for priority in range(1, self.number_priority_levels):
+		for priority in range(self.number_priority_levels):
 
 			constraints = self.constraints[priority]
 			dict_p = self.Mw_dict[priority]
 
 			if 'lub' in constraints:
 				m = constraints['lub']['A_vals'].shape[0]
-				dict_p['lub_slack_weight'].setValue(np.ones(m)*weights[priority-1])
-				dict_p['lub_ub'].setValue(constraints['lub']['ub_vals'][0])
-				dict_p['lub_lb'].setValue(constraints['lub']['lb_vals'][0])
+				if priority >= 1:
+					dict_p['lub_slack_weight'].setValue(np.ones(m)*weights[priority-1])
+				dict_p['lub_ub'].setValue(constraints['lub']['ub_vals'])
+				dict_p['lub_lb'].setValue(constraints['lub']['lb_vals'])
 				dict_p['lub_A'].setValue(constraints['lub']['A_vals'])
 
 			if 'ub' in constraints:
 				m = constraints['ub']['A_vals'].shape[0]
-				dict_p['ub_slack_weight'].setValue(np.ones(m)*weights[priority-1])
-				dict_p['ub_ub'].setValue(constraints['ub']['ub_vals'][0])
+				if priority >= 1:
+					dict_p['ub_slack_weight'].setValue(np.ones(m)*weights[priority-1])
+				dict_p['ub_ub'].setValue(constraints['ub']['ub_vals'])
 				dict_p['ub_A'].setValue(constraints['ub']['A_vals'])
 
 			if 'eq' in constraints:
 				m = constraints['eq']['A_vals'].shape[0]
-				dict_p['eq_slack_weight'].setValue(np.ones(m)*weights[priority-1])
-				dict_p['eq_b'].setValue(constraints['eq']['b_vals'][0])
+				if priority >= 1:
+					dict_p['eq_slack_weight'].setValue(np.ones(m)*weights[priority-1])
+				dict_p['eq_b'].setValue(constraints['eq']['b_vals'])
 				dict_p['eq_A'].setValue(constraints['eq']['A_vals'])
 
 		self.Mw.solve()
@@ -224,15 +265,15 @@ if __name__ == '__main__':
 	hlp = lexopt_mosek()
 	x0, x = hlp.create_variable(2, cs.vcat([-5, -5]), cs.vcat([5, 5]))
 	# z0, z = hlp.create_variable(1, cs.vcat([-5]), cs.vcat([5]))
-	hlp.create_constraint(x[0]*0.707 - x[1]*0.707, 'ub', 1, {'ub':0})
-	hlp.create_constraint(x[1], 'eq', 2, {'b':0})
-	hlp.create_constraint(-x[0], 'lub', 3, {'ub':-1, 'lb':-2})
+	hlp.create_constraint(x[0]*0.707 - x[1]*0.707, 'lub', 0, {'ub':0, 'lb':0})
+	hlp.create_constraint(x[1], 'eq', 1, {'b':0})
+	hlp.create_constraint(-x[0], 'lub', 2, {'ub':-1, 'lb':-2})
 	hlp.configure_constraints()
 	hlp.compute_matrices([0,0],[1,1])
 	hlp.configure_weighted_problem()
 	hlp.solve_weighted_method([5,2,1])
-	hlp.Mw.solve()
-	print(hlp.Mw.getSolverDoubleInfo("simTime"))
+	hlp.solve_weighted_method([5,2,1])
+	print(hlp.Mw.getSolverDoubleInfo("optimizerTime"))
 	print(hlp.Mw_dict['x'].level())
 	print(hlp.Mw_dict[2]['eq_slack'].level())
 	print(hlp.Mw.primalObjValue())
