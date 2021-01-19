@@ -560,7 +560,7 @@ class hqp:
 					obj += weight*slacks_now[j]
 
 				if priority == number_priorities:
-					opti.minimize(obj + cs.sumsqr(variables_dot)*1e-12) #sufficient to add regularization only at the last level
+					opti.minimize(obj + cs.sumsqr(variables_dot)*1e-12*0) #sufficient to add regularization only at the last level
 				else:
 					opti.minimize(obj)
 
@@ -1311,6 +1311,9 @@ class hqp:
 						# sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_temp)
 						sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init, gamma_limit = pl)
 						con_viol_test = np.array(sol_test.value(self.slacks[pl]))
+						for pl_h in range(1,pl):
+							if cs.norm_1(sol_test.value(self.slacks[pl_h])) >= cs.norm_1(constraint_violations[pl_h]) + 1e-6:
+								gamma_init[pl_h] *= 5
 						print("constraint violations from test")
 						print(con_viol_test)
 						con_violated = con_viol_test >= 1e-4 #boolean array signifying which constraints are violated
@@ -1320,7 +1323,7 @@ class hqp:
 						print(con_violated)
 						con_violated = [j for j, s in enumerate(con_violated) if s]
 
-						if cs.norm_1(constraint_violations[pl] - con_viol_test) <= 1e-5:
+						if cs.norm_1(constraint_violations[pl]) - cs.norm_1(con_viol_test) <= 1e-6:
 							self.inf_but_optimal[pl] = infeasible_constraints[pl]
 							self.constraints_violated[pl] = constraint_violations[pl]
 						else:

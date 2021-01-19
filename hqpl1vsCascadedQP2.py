@@ -49,14 +49,14 @@ def hqpvschqp(params):
 	count_same_constraints = 0
 	count_identical_solution = 0
 	count_geq_constraints = 0
-	
+
 	hqp = hqp_p.hqp()
 	print("Using random seed " + str(rand_seed))
 	# n_eq_per_level = 6
 	# n_ineq_per_level = 6
-	np.random.seed(rand_seed) #for 45, 1, 8 HQP-l1 does not agree with the cHQP 
+	np.random.seed(rand_seed) #for 45, 1, 8 HQP-l1 does not agree with the cHQP
 	#15, 18, 11 for 8 priority levels
-	
+
 	x, x_dot = hqp.create_variable(n, 1e-12)
 	A_eq_all = cs.DM(np.random.randn(params['eq_con_rank'], n))
 	A_extra = (A_eq_all.T@cs.DM(np.random.randn(params['eq_con_rank'], total_eq_constraints - params['eq_con_rank']))).T
@@ -75,7 +75,7 @@ def hqpvschqp(params):
 			A_eq_all[i,j] = A_eq_all[i,j].T/row_vec_norm[i]
 
 
-	
+
 	A_ineq_all = cs.DM(np.random.randn(params['ineq_con_rank'], n))
 	A_ineq_extra = (A_ineq_all.T@cs.DM(np.random.randn(params['ineq_con_rank'], total_ineq_constraints - params['ineq_con_rank']))).T
 	A_ineq_all = cs.vertcat(A_ineq_all, A_ineq_extra)
@@ -88,13 +88,13 @@ def hqpvschqp(params):
 	#normalizing the each row vector
 	row_ineqvec_norm = []
 	for i in range(A_ineq_all.shape[0]):
-		row_ineqvec_norm.append(cs.norm_1(A_ineq_all[i,:])) 
+		row_ineqvec_norm.append(cs.norm_1(A_ineq_all[i,:]))
 		b_ineq_all[i] /= row_ineqvec_norm[i]
 		b_ineq_all_lower[i] /= row_ineqvec_norm[i]
 		for j in range(A_ineq_all.shape[1]):
 			A_ineq_all[i,j] = A_ineq_all[i,j]/row_ineqvec_norm[i]
-	
-	
+
+
 
 	A_eq = {}
 	b_eq = {}
@@ -102,11 +102,11 @@ def hqpvschqp(params):
 	b_eq_opti = {}
 	A_ineq_opti = {}
 	b_upper_opti = {}
-	
+
 	A_ineq = {}
 	b_upper = {}
 	b_lower = {}
-	
+
 	params = x
 	params_init = [0]*n
 	#create these tasks
@@ -120,7 +120,7 @@ def hqpvschqp(params):
 			b_eq[i] = b_eq_all[counter_eq:counter_eq + n_eq_per_level]
 			counter_eq += n_eq_per_level
 			hqp.create_constraint(cs.mtimes(A_eq[i],x_dot) - b_eq[i], 'equality', priority = i)
-	
+
 
 			A_ineq[i] = A_ineq_all[counter_ineq:counter_ineq + n_ineq_per_level, :]
 			b_upper[i] = b_ineq_all[counter_ineq:counter_ineq + n_ineq_per_level]
@@ -133,7 +133,7 @@ def hqpvschqp(params):
 			b_eq[i] = b_eq_all[counter_eq:counter_eq + eq_last_level]
 			counter_eq += eq_last_level
 			hqp.create_constraint(cs.mtimes(A_eq[i],x_dot) - b_eq[i], 'equality', priority = i)
-	
+
 
 			A_ineq[i] = A_ineq_all[counter_ineq:counter_ineq + ineq_last_level, :]
 			b_upper[i] = b_ineq_all[counter_ineq:counter_ineq + ineq_last_level]
@@ -153,8 +153,8 @@ def hqpvschqp(params):
 	hqp.configure()
 
 	# hqp.setup_cascadedQP()
-	
-	
+
+
 	sol_chqp = hqp.solve_cascadedQP5(params_init, [0]*n)
 	enablePrint()
 	chqp_status = sol_chqp != False
@@ -218,13 +218,13 @@ def hqpvschqp(params):
 		running_counter_satisfied_con_hqp = 0
 		running_counter_satisfied_con_chqp = 0
 		for i in range(1,pl):
-		
+
 			sol_hqp = sol.value(hqp.slacks[i])
-		
+
 			con_viol.append(cs.norm_1(sol_hqp))
 			# sol_cHQP = sol_chqp[pl - 1].value(hqp.slacks[i])
 			sol_cHQP = sol_chqp[i].value(hqp.cHQP_slacks[i])
-		
+
 			con_viol2.append(cs.norm_1(sol_cHQP))
 
 			#Computing which constraints are satisfied
@@ -278,7 +278,7 @@ def hqpvschqp(params):
 					fp += 1
 				else:
 					tn += 1
-	
+
 		elif same_constraints_satisfied:
 			# print("same constraints are satisfied")
 			count_same_constraints += 1
@@ -288,7 +288,7 @@ def hqpvschqp(params):
 					fp += 1
 				else:
 					tn += 1
-	
+
 		elif geq_constraints_satisfied or lex_con_norm:
 			# print("The same of greater number of constriants satisfied at each level")
 			count_geq_constraints += 1
@@ -325,11 +325,11 @@ def hqpvschqp(params):
 
 if __name__ == "__main__":
 
-	n = 30
-	total_eq_constraints = 15
-	eq_con_rank = 5
-	total_ineq_constraints = 15
-	ineq_con_rank = 5
+	n = 25
+	total_eq_constraints = 25
+	eq_con_rank = 15
+	total_ineq_constraints = 25
+	ineq_con_rank = 15
 	params = {}
 	params['n'] = n
 	params['eq_con_rank'] = eq_con_rank
@@ -339,18 +339,18 @@ if __name__ == "__main__":
 	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
 	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 	# gamma_vals = [0.1]
-	gamma_vals = [0.2]
+	gamma_vals = [45.0]
 	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 	# gamma_vals = [10.0, 20.0, 50.0]
 	# pl_vals = [3, 4, 9, 10]
-	pl_vals = [6]
+	pl_vals = [5]
 	# gamma_vals = [10.0]
 	# pl_vals = [20]
 	results = {}
 
 	verbose = True
-	adaptive_method = True
+	adaptive_method = False
 	params['adaptive_method'] = adaptive_method
 	for gamma in gamma_vals:
 		print("gamma value :" + str(gamma))
@@ -375,15 +375,15 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1050):
+			for rand_seed in range(1000, 1300):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
-				
+
 					# identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status, lex_con_norm = hqpvschqp(params)
 				result = hqpvschqp(params)
 					# identical_solution, same_constraints_satisfied, geq_constraints_satisfied, chqp_status, hqp_status, lex_con_norm, hf_heuristic = hqpvschqp(params)
 					# result = hqpvschqp(params)
-						
+
 				chqp_status = result['chqp_status']
 				hqp_status = result['hqp_status']
 				if chqp_status and hqp_status:
@@ -400,7 +400,7 @@ if __name__ == "__main__":
 					if adaptive_method:
 						if result['heuristic_prediction']:
 							count_hqp_heuristic_pred += 1
-				
+
 				if chqp_status and hqp_status:
 					total_trials += 1
 					if lex_con_norm:
@@ -447,4 +447,3 @@ if __name__ == "__main__":
 	print(results)
 	with open('./hqp_vs_chqp_results.txt', 'w') as fp:
 		json.dump(results, fp)
-
