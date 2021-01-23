@@ -2,7 +2,7 @@
 #This file is meant to be used for verifying the performance of algorithms in simulation.
 #The class should have robot related variables that are updated continiously in run_simulation for communication
 #with a middleware (ROS)
-
+from pybullet_utils import bullet_client as bc
 import numpy as np
 import pybullet as p
 import pybullet_data
@@ -15,7 +15,11 @@ class world_simulator:
 		self.verbose = True
 		self.physics_ts = 1.0/240.0 #Time step for the bullet environment for physics simulation
 		if bullet_gui:
-			physicsClient = p.connect(p.GUI)
+			# physicsClient = p.connect(p.GUI)
+			p0 = bc.BulletClient(connection_mode=p.GUI)
+			p0.addUserDebugParameter("Disconnect",1,0,1)
+			p0.resetDebugVisualizerCamera( cameraDistance=1.5, cameraYaw=55, cameraPitch=-10, cameraTargetPosition=[0,0,0.5])
+			self.physicsClient = p0
 		else:
 			physicsClient = p.connect(p.DIRECT)
 		p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
@@ -33,6 +37,7 @@ class world_simulator:
 
 		# Set default camera position
 		p.resetDebugVisualizerCamera( cameraDistance=1.5, cameraYaw=55, cameraPitch=-10, cameraTargetPosition=[0,0,0.5])
+
 
 	## add_cylinder(radius, height, weight, pose)
 	# Function to add a uniform cylinder. Closely follows the interface of pybullet

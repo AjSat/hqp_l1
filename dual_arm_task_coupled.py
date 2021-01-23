@@ -66,6 +66,7 @@ if __name__ == '__main__':
 	#decision variables for robot 2
 	q2, q_dot2 = hqp.create_variable(7, regularization)
 	J2 = jac_fun_rob(q2)
+	jac_fun_rob.save('jac_fun_rob.casadi')
 	J2 = cs.vertcat(J2[0], J2[1])
 	#progress variables for robot 2
 	s_2, s_dot2 = hqp.create_variable(1, regularization)
@@ -115,9 +116,9 @@ if __name__ == '__main__':
 	q_torso_dot_prev = hqp.create_parameter(1)#hqp.opti.parameter(7, 1)
 	# hqp.opti.set_value(q_dot1_prev, cs.DM([0]*7))
 	# hqp.opti.set_value(q_dot2_prev, cs.DM([0]*7))
-	# hqp.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
-	# hqp.create_constraint(q_dot2 - q_dot2_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
-	# hqp.create_constraint(q_torso_dot - q_torso_dot_prev, 'lub', priority = 0, options = {'lb':np.array([-max_joint_acc[0]*ts]), 'ub':np.array([max_joint_acc[0]*ts])})
+	hqp.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+	hqp.create_constraint(q_dot2 - q_dot2_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
+	hqp.create_constraint(q_torso_dot - q_torso_dot_prev, 'lub', priority = 0, options = {'lb':np.array([-max_joint_acc[0]*ts]), 'ub':np.array([max_joint_acc[0]*ts])})
 
 	#2nd priority: Orientation constraints are fixed, And also the TODO: obstacle avoidance
 
@@ -179,6 +180,10 @@ if __name__ == '__main__':
 
 	constraint_violations = cs.DM([0, 0, 0, 0])
 
+	q_zero_integral = 0
+	q_1_integral = 0
+	q_2_integral = 0
+
 	#Setup for visualization
 	visualizationBullet = True
 	counter = 1
@@ -191,14 +196,20 @@ if __name__ == '__main__':
 
 		position = [0.0, 0.0, 0.0]
 		orientation = [0.0, 0.0, 0.0, 1.0]
+		# torsoID = p.loadURDF("models/robots/rotating_torso.urdf",[0.3,0.15,0], orientation, useFixedBase = True)
+		# kukaID = p.loadURDF("kuka_iiwa/model.urdf", position, orientation, useFixedBase=False)
+		# position = [0.0, 0.3, 0.0]
+		# kukaID2 = obj.add_robot(position, orientation, 'iiwa7', fixedBase = False)
+		combined_robot = p.loadURDF("models/robots/combined.urdf")
 
-		kukaID = obj.add_robot(position, orientation, 'iiwa7')
-		position = [0.0, 0.3, 0.0]
-		kukaID2 = obj.add_robot(position, orientation, 'iiwa7')
 
-		joint_indices = [0, 1, 2, 3, 4, 5, 6]
-		obj.resetJointState(kukaID, joint_indices, q0_1)
-		obj.resetJointState(kukaID2, joint_indices, q0_2)
+		joint_index = [0]
+		obj.resetJointState(combined_robot, [0], [0.0])
+		joint_indices1 = [2, 3, 4, 5, 6, 7, 8]
+		obj.resetJointState(combined_robot, joint_indices1, q0_1)
+		joint_indices2 = [10, 11, 12, 13, 14, 15, 16]
+		obj.resetJointState(combined_robot, joint_indices2, q0_2)
+		# time.sleep(5.0)
 		obj.physics_ts = ts
 
 	# time.sleep(5)
@@ -207,7 +218,7 @@ if __name__ == '__main__':
 	max_err = 0;
 	hqp.once_solved = False
 	no_times_exceeded = 0
-	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
+	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 0.1)
 	comp_time.append(hqp.time_taken)
 
 	sequential_method = False
@@ -216,7 +227,7 @@ if __name__ == '__main__':
 		hqp.time_taken = 0
 
 		if not sequential_method:
-			sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 5)
+			sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 10.0, iter_lim = 5)
 			# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 			q_dot1_sol = sol.value(q_dot1)
 			q_dot2_sol = sol.value(q_dot2)
@@ -227,7 +238,7 @@ if __name__ == '__main__':
 			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
 			enablePrint()
 			print(hqp.time_taken)
-			print("q_torso_dot = "+str(q_torso_dot_sol))
+			# print("q_torso_dot = "+str(q_torso_dot_sol))
 			comp_time.append(hqp.time_taken)
 			blockPrint()
 
@@ -237,8 +248,8 @@ if __name__ == '__main__':
 			q_dot_opt = q_dot_opt.full()
 			q_opt = q_opt.full()
 			# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
-			sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-			# sol_cqp = hqp.solve_cascadedQP_L2(q_opt, q_dot_opt)#, solver = 'ipopt')
+			# sol_cqp = hqp.solve_cascadedQP4(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
+			sol_cqp = hqp.solve_cascadedQP_L2_warmstart(q_opt, q_dot_opt, warm_start = True)
 			# # # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 			sol = sol_cqp[4]
 			# # # print(var_dot.shape)
@@ -246,6 +257,7 @@ if __name__ == '__main__':
 			var_dot_sol = sol.value(hqp.cHQP_xdot[4])
 			enablePrint()
 			print(hqp.time_taken)
+			comp_time.append(hqp.time_taken)
 			# # comp_time.append(hqp.time_taken)
 			# # blockPrint()
 			q_dot1_sol = var_dot_sol[0:7]
@@ -270,23 +282,33 @@ if __name__ == '__main__':
 		q_dot_opt = cs.vertcat(q_dot1_sol, s_dot1_sol, q_dot2_sol, s_dot2_sol, q_torso_dot_sol)
 		q_opt[0:17] += ts*q_dot_opt
 
+		number_non_zero = sum(cs.fabs(q_dot1_sol) >=  1e-3) + sum(cs.fabs(q_dot2_sol) >=  1e-3)
+		q_zero_integral += number_non_zero*ts
+		q_2_integral += (cs.sumsqr(q_dot1_sol) + cs.sumsqr(q_dot2_sol))*ts
+		q_1_integral += sum(cs.fabs(q_dot1_sol).full() + cs.fabs(q_dot2_sol).full())*ts
+
 		s1_opt = q_opt[7]
-		if s1_opt >=1:
-			print("Robot1 reached it's goal. Terminating")
-			cool_off_counter += 1
-			# break
-			if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
-				break
+		q_opt = cs.DM(q_opt)
+		# if s1_opt >=1:
+		# 	print("Robot1 reached it's goal. Terminating")
+		# 	cool_off_counter += 1
+		# 	# break
+		# 	if cool_off_counter >= 100: #ts*100 cooloff period for the robot to exactly reach it's goal
+		# 		break
 
 		# fk_vals1_sol = sol.value(fk_vals1)
 		# fk_vals2_sol = sol.value(fk_vals2)
 		# print(fk_vals1_sol)
 		# print(fk_vals2_sol)
 
+
+
 		if visualizationBullet:
-			obj.setController(kukaID, "velocity", joint_indices, targetVelocities = q_dot1_sol)
-			obj.setController(kukaID2, "velocity", joint_indices, targetVelocities = q_dot2_sol)
-			obj.run_simulation(1)
+			obj.resetJointState(combined_robot, joint_indices1,list(q_opt[0:7].full()))
+			obj.resetJointState(combined_robot, joint_indices2,list(q_opt[8:15].full()))
+			obj.resetJointState(combined_robot, [0],list(q_opt[16].full()))
+			time.sleep(ts)
+
 
 	# 	J_sol = sol.value(J)
 
@@ -316,6 +338,9 @@ if __name__ == '__main__':
 		obj.end_simulation()
 
 	time_l1opt = time.time() - tic
+	print("Total average number of actuators used = " + str(q_zero_integral/5))
+	print("Total average number of L2  = " + str(q_2_integral/5))
+	print("Total average number of L1 = " + str(q_1_integral/5))
 
 	# # print("Nullspace Projection took " + str(time_nsp) +"s")
 	print("L1 optimization method took " + str(time_l1opt) +"s")
@@ -324,22 +349,22 @@ if __name__ == '__main__':
 	# print(q_opt_history[:,-1])
 
 	#Implementing solution by Hierarchical QP
-	figure()
-	plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
-	plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
-	plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
-	plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
-	title("Constraint violations")
-	xlabel("Time step (Control sampling time = 0.005s)")
-	legend()
-
-	figure()
-	plot(list(range(counter-1)), q_dot_opt_history.full().T)
-	# plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
-	# #
-	title("joint_velocities")
-	xlabel("No of samples in the horizon (sampling time = 0.05s)")
-	ylabel('rad/s')
+	# figure()
+	# plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
+	# plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
+	# plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
+	# plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
+	# title("Constraint violations")
+	# xlabel("Time step (Control sampling time = 0.005s)")
+	# legend()
+	#
+	# figure()
+	# plot(list(range(counter)), q_dot_opt_history.full().T)
+	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
+	# # #
+	# title("joint_velocities")
+	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	# ylabel('rad/s')
 
 	figure()
 	semilogy(list(range(counter)), comp_time)

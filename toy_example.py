@@ -58,8 +58,8 @@ if __name__ == '__main__':
 	q0_1 = [0.5, 1.86726808e-01, -1.32319806e-01, -2.06761360e+00, 3.12421835e-02,  8.89043596e-01, -7.03329152e-01]
 
 	L1_regularization = True #L2 regularization if false
-	HLP = True #Implement cascadedQP if false
-	acceleration_limit = True #enforce hard bounds on acceleration if true
+	HLP = False #Implement cascadedQP if false
+	acceleration_limit = False #enforce hard bounds on acceleration if true
 
 	## Defining the first set of tasks
 	hqp = hqp_class()
@@ -219,7 +219,7 @@ if __name__ == '__main__':
 	#2nd priority
 	hqp2.create_constraint(J1[0:2,:]@cs.vertcat(q_dot1) - cs.vertcat(-0.10,-0.10), 'equality', priority = 1)
 	#3rd priority
-	hqp2.create_constraint(J1[0:2,:]@cs.vertcat(q_dot1) - cs.vertcat(-0.00,0.00), 'equality', priority = 3)
+	hqp2.create_constraint(J1[0:2,:]@cs.vertcat(q_dot1) - cs.vertcat(-0.05,-0.05), 'equality', priority = 3)
 
 	if L1_regularization:
 		hqp2.create_constraint(q_dot1 - 0, 'equality', priority = 4)
@@ -245,7 +245,7 @@ if __name__ == '__main__':
 			q_opt = q_opt.full()
 			q_dot_opt = q_dot_opt.full()
 			# sol_cqp = hqp2.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-			sol_cqp = hqp2.solve_cascadedQP_L2(q_opt, q_dot_opt)#, solver = 'ipopt')
+			sol_cqp = hqp2.solve_cascadedQP_L2_warmstart(q_opt, q_dot_opt)#, solver = 'ipopt')
 			if L1_regularization:
 				sol = sol_cqp[4]
 				var_dot_sol = sol.value(hqp2.cHQP_xdot[4])
@@ -406,10 +406,11 @@ if __name__ == '__main__':
 	if acceleration_limit:
 		hqp4.create_constraint(q_dot1 - q_dot1_prev, 'lub', priority = 0, options = {'lb':-max_joint_acc*ts, 'ub':max_joint_acc*ts})
 	#1st priority constraint
-	hqp4.create_constraint(J1[0:2,:]@cs.vertcat(q_dot1) - cs.vertcat(1.0, 0.0), 'equality', priority = 1)
+	hqp4.create_constraint(J1[1,:]@cs.vertcat(q_dot1) - cs.vertcat(0.1), 'equality', priority = 1)
+	hqp4.create_constraint(J1[0,:]@cs.vertcat(q_dot1) - cs.vertcat(1.0), 'equality', priority = 2)
 
 	if L1_regularization:
-		hqp4.create_constraint(q_dot1 - 0, 'equality', priority = 2)
+		hqp4.create_constraint(q_dot1 - 0, 'equality', priority = 3)
 
 	hqp4.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
 	hqp4.configure()

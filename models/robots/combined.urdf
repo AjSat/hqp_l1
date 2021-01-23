@@ -1,0 +1,521 @@
+<?xml version="0.0" ?>
+<robot name="">
+	<link name="base_link">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<mass value="0.00000"/>
+			<inertia ixx="0.00000" ixy="0" ixz="0" iyy="0.00000" iyz="0" izz="0.00000"/>
+		</inertial>
+	</link>
+	<link name="link_torso">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.05000"/>
+			<mass value="2.00000"/>
+			<inertia ixx="0.06213" ixy="0" ixz="0" iyy="0.00853" iyz="0" izz="0.06720"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="models/robots/cube.obj" scale="0.30000 1.00000 0.10000"/>
+			</geometry>
+			<material name="red">
+				<color rgba="0.80000 0.20000 0.00000 1.00000" />
+			</material>
+		</visual>
+	</link>
+	<link name="lbr_iiwa_link_0">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="-0.10000 0.00000 0.07000"/>
+			<mass value="0.00000"/>
+			<inertia ixx="0.00000" ixy="0" ixz="0" iyy="0.00000" iyz="0" izz="0.00000"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_0.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_-1_0">
+				<color rgba="0.20000 0.20000 0.20000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_0.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_1">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 -0.03000 0.12000"/>
+			<mass value="4.00000"/>
+			<inertia ixx="0.04509" ixy="0" ixz="0" iyy="0.04124" iyz="0" izz="0.02474"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_1.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_0_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_1.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_2">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00030 0.05900 0.04200"/>
+			<mass value="4.00000"/>
+			<inertia ixx="0.04343" ixy="0" ixz="0" iyy="0.02460" iyz="0" izz="0.03965"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_2.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_1_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_2.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_3">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.03000 0.13000"/>
+			<mass value="3.00000"/>
+			<inertia ixx="0.03130" ixy="0" ixz="0" iyy="0.02744" iyz="0" izz="0.01394"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_3.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_2_0">
+				<color rgba="1.00000 0.42353 0.03922 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_3.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_4">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.06700 0.03400"/>
+			<mass value="2.70000"/>
+			<inertia ixx="0.02302" ixy="0" ixz="0" iyy="0.01255" iyz="0" izz="0.01957"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_4.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_3_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_4.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_5">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00010 0.02100 0.07600"/>
+			<mass value="1.70000"/>
+			<inertia ixx="0.01559" ixy="0" ixz="0" iyy="0.01421" iyz="0" izz="0.00710"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_5.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_4_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_5.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_6">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00060 0.00040"/>
+			<mass value="1.80000"/>
+			<inertia ixx="0.00761" ixy="0" ixz="0" iyy="0.00597" iyz="0" izz="0.00738"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_6.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_5_0">
+				<color rgba="1.00000 0.42353 0.03922 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_6.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_7">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.02000"/>
+			<mass value="0.30000"/>
+			<inertia ixx="0.00039" ixy="0" ixz="0" iyy="0.00040" iyz="0" izz="0.00060"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_7.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_6_0">
+				<color rgba="0.20000 0.20000 0.20000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_7.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_02">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="-0.10000 0.00000 0.07000"/>
+			<mass value="0.00000"/>
+			<inertia ixx="0.00000" ixy="0" ixz="0" iyy="0.00000" iyz="0" izz="0.00000"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_0.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_-1_0">
+				<color rgba="0.20000 0.20000 0.20000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_0.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_12">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 -0.03000 0.12000"/>
+			<mass value="4.00000"/>
+			<inertia ixx="0.04509" ixy="0" ixz="0" iyy="0.04124" iyz="0" izz="0.02474"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_1.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_0_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_1.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_22">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00030 0.05900 0.04200"/>
+			<mass value="4.00000"/>
+			<inertia ixx="0.04343" ixy="0" ixz="0" iyy="0.02460" iyz="0" izz="0.03965"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_2.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_1_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_2.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_32">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.03000 0.13000"/>
+			<mass value="3.00000"/>
+			<inertia ixx="0.03130" ixy="0" ixz="0" iyy="0.02744" iyz="0" izz="0.01394"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_3.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_2_0">
+				<color rgba="1.00000 0.42353 0.03922 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_3.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_42">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.06700 0.03400"/>
+			<mass value="2.70000"/>
+			<inertia ixx="0.02302" ixy="0" ixz="0" iyy="0.01255" iyz="0" izz="0.01957"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_4.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_3_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_4.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_52">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00010 0.02100 0.07600"/>
+			<mass value="1.70000"/>
+			<inertia ixx="0.01559" ixy="0" ixz="0" iyy="0.01421" iyz="0" izz="0.00710"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_5.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_4_0">
+				<color rgba="0.50000 0.70000 1.00000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_5.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_62">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00060 0.00040"/>
+			<mass value="1.80000"/>
+			<inertia ixx="0.00761" ixy="0" ixz="0" iyy="0.00597" iyz="0" izz="0.00738"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_6.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_5_0">
+				<color rgba="1.00000 0.42353 0.03922 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_6.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="lbr_iiwa_link_72">
+		<inertial>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.02000"/>
+			<mass value="0.30000"/>
+			<inertia ixx="0.00039" ixy="0" ixz="0" iyy="0.00040" iyz="0" izz="0.00060"/>
+		</inertial>
+		<visual>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_7.obj" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+			<material name="mat_6_0">
+				<color rgba="0.20000 0.20000 0.20000 1.00000" />
+			</material>
+		</visual>
+		<collision>
+			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+			<geometry>
+				<mesh filename="/home/ajay/env37/lib/python3.7/site-packages/pybullet-3.0.8-py3.7-linux-x86_64.egg/pybullet_data/kuka_iiwa/meshes/link_7.stl" scale="1.00000 1.00000 1.00000"/>
+			</geometry>
+		</collision>
+	</link>
+	<joint name="j_torso" type="revolute">
+		<parent link="base_link"/>
+		<child link="link_torso"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="3000" lower="-3.05432619099" upper="3.05432619099" velocity="10"/>
+	</joint>
+	<joint name="joint_dummy1" type="fixed">
+		<parent link="link_torso"/>
+		<child link="lbr_iiwa_link_0"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 -0.15000 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_1" type="revolute">
+		<parent link="lbr_iiwa_link_0"/>
+		<child link="lbr_iiwa_link_1"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.15750"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_2" type="revolute">
+		<parent link="lbr_iiwa_link_1"/>
+		<child link="lbr_iiwa_link_2"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 -3.14159" xyz="0.00000 0.00000 0.20250"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_3" type="revolute">
+		<parent link="lbr_iiwa_link_2"/>
+		<child link="lbr_iiwa_link_3"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 -3.14159" xyz="0.00000 0.20450 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+    <dynamics damping="0.5"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_4" type="revolute">
+		<parent link="lbr_iiwa_link_3"/>
+		<child link="lbr_iiwa_link_4"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 0.00000" xyz="0.00000 0.00000 0.21550"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_5" type="revolute">
+		<parent link="lbr_iiwa_link_4"/>
+		<child link="lbr_iiwa_link_5"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 3.14159" xyz="0.00000 0.18450 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_6" type="revolute">
+		<parent link="lbr_iiwa_link_5"/>
+		<child link="lbr_iiwa_link_6"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 0.00000" xyz="0.00000 0.00000 0.21550"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_7" type="revolute">
+		<parent link="lbr_iiwa_link_6"/>
+		<child link="lbr_iiwa_link_7"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 3.14159" xyz="0.00000 0.08100 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-3.05432619099" upper="3.05432619099" velocity="10"/>
+    <dynamics damping="0.5"/>
+	</joint>
+	<joint name="joint_dummy2" type="fixed">
+		<parent link="link_torso"/>
+		<child link="lbr_iiwa_link_02"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.15000 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_12" type="revolute">
+		<parent link="lbr_iiwa_link_02"/>
+		<child link="lbr_iiwa_link_12"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.15750"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_22" type="revolute">
+		<parent link="lbr_iiwa_link_12"/>
+		<child link="lbr_iiwa_link_22"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 -3.14159" xyz="0.00000 0.00000 0.20250"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_32" type="revolute">
+		<parent link="lbr_iiwa_link_22"/>
+		<child link="lbr_iiwa_link_32"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 -3.14159" xyz="0.00000 0.20450 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_42" type="revolute">
+		<parent link="lbr_iiwa_link_32"/>
+		<child link="lbr_iiwa_link_42"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 0.00000" xyz="0.00000 0.00000 0.21550"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_52" type="revolute">
+		<parent link="lbr_iiwa_link_42"/>
+		<child link="lbr_iiwa_link_52"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 3.14159" xyz="0.00000 0.18450 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.96705972839" upper="2.96705972839" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_62" type="revolute">
+		<parent link="lbr_iiwa_link_52"/>
+		<child link="lbr_iiwa_link_62"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 0.00000" xyz="0.00000 0.00000 0.21550"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-2.09439510239" upper="2.09439510239" velocity="10"/>
+	</joint>
+	<joint name="lbr_iiwa_joint_72" type="revolute">
+		<parent link="lbr_iiwa_link_62"/>
+		<child link="lbr_iiwa_link_72"/>
+		<dynamics damping="0.0" friction="0.0001"/>
+		<origin rpy="1.57080 -0.00000 3.14159" xyz="0.00000 0.08100 0.00000"/>
+		<axis xyz="0.00000 0.00000 1.00000"/>
+		<limit effort="300" lower="-3.05432619099" upper="3.05432619099" velocity="10"/>
+	</joint>
+</robot>

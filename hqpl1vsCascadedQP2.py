@@ -221,9 +221,12 @@ def hqpvschqp(params):
 
 			sol_hqp = sol.value(hqp.slacks[i])
 
+			obj_sol_hqp = sum(list(sol_hqp)) + 0.1*cs.sumsqr(sol_hqp)
+
 			con_viol.append(cs.norm_1(sol_hqp))
 			# sol_cHQP = sol_chqp[pl - 1].value(hqp.slacks[i])
 			sol_cHQP = sol_chqp[i].value(hqp.cHQP_slacks[i])
+			obj_sol_chqp = sum(list(sol_cHQP)) + 0.1*cs.sumsqr(sol_cHQP)
 
 			con_viol2.append(cs.norm_1(sol_cHQP))
 
@@ -241,7 +244,8 @@ def hqpvschqp(params):
 			if running_counter_satisfied_con_hqp < running_counter_satisfied_con_chqp:
 				geq_constraints_satisfied = False
 
-			if cs.norm_1(sol_hqp) > cs.norm_1(sol_cHQP) + 1e-4:
+			# if cs.norm_1(sol_hqp) > cs.norm_1(sol_cHQP) + 1e-4:
+			if obj_sol_hqp > obj_sol_chqp + 1e-4:
 				lex_con_norm = False
 				if verbose:
 					print("Lex norm unsatisfied!!!!!!!!!!!!!!!!!")
@@ -339,12 +343,12 @@ if __name__ == "__main__":
 	# gamma_vals = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 7.0, 10.0, 14.0, 15.0, 20.0, 40.0, 60.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
 	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 	# gamma_vals = [0.1]
-	gamma_vals = [45.0]
-	pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+	gamma_vals = [0.2]
+	# pl_vals = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 	# gamma_vals = [10.0, 20.0, 50.0]
 	# pl_vals = [3, 4, 9, 10]
-	pl_vals = [5]
+	pl_vals = [10]
 	# gamma_vals = [10.0]
 	# pl_vals = [20]
 	results = {}
@@ -375,7 +379,7 @@ if __name__ == "__main__":
 			total_trials = 0
 			params['pl'] = pl
 			params['gamma'] = gamma
-			for rand_seed in range(1000, 1300):
+			for rand_seed in range(1000, 1050):
 				# print(rand_seed)
 				params['rand_seed'] = rand_seed
 

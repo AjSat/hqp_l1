@@ -137,8 +137,8 @@ if __name__ == '__main__':
 	s2_dot_rate_ff = 0.5
 	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
 
-	hqp.create_constraint(q_dot1, 'equality', priority = 4)
-	hqp.create_constraint(q_dot2, 'equality', priority = 4)
+	hqp.create_constraint(q_dot1, 'equality', priority = 5)
+	hqp.create_constraint(q_dot2, 'equality', priority = 5)
 
 	p_opts = {"expand":True}
 
@@ -150,7 +150,7 @@ if __name__ == '__main__':
 	# max_iter = 2
 	# max_iter_ls = 3
 	# qpsol_options = {'constr_viol_tol': kkt_tol_pr, 'dual_inf_tol': kkt_tol_du, 'verbose' : False, 'print_iter': False, 'print_header': False, 'dump_in': False, "error_on_fail" : False}
-	# solver_options = {'qpsol': 'qrqp', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
+	# solver_options = {'qpsol': 'qpoases', 'qpsol_options': qpsol_options, 'verbose': False, 'tol_pr': kkt_tol_pr, 'tol_du': kkt_tol_du, 'min_step_size': min_step_size, 'max_iter': max_iter, 'max_iter_ls': max_iter_ls, 'print_iteration': True, 'print_header': False, 'print_status': False, 'print_time': True}
 	hqp.opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, "record_time":True, 'max_iter': 1000})
 	# hqp.opti.solver("ipopt", {"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
 
@@ -172,7 +172,7 @@ if __name__ == '__main__':
 		import world_simulator
 		import pybullet as p
 
-		obj = world_simulator.world_simulator()
+		obj = world_simulator.world_simulator(bullet_gui=True)
 
 		position = [0.0, 0.0, 0.0]
 		orientation = [0.0, 0.0, 0.0, 1.0]
@@ -194,41 +194,48 @@ if __name__ == '__main__':
 	no_times_exceeded = 0
 	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 10)
 	comp_time.append(hqp.time_taken)
-	for i in range(math.ceil(T/ts)):
+	for i in range(500):#math.ceil(T/ts)):
 		counter += 1
 		hqp.time_taken = 0
-		sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 5)
-		# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 50.0)
-		enablePrint()
-		print(hqp.time_taken)
-		comp_time.append(hqp.time_taken)
-		blockPrint()
-		q_dot1_sol = sol.value(q_dot1)
-		q_dot2_sol = sol.value(q_dot2)
-		s_dot1_sol = sol.value(s_dot1)
-		s_dot2_sol = sol.value(s_dot2)
-		con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
-		constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
+		# sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 5)
+		# # sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 2.0)
+		# enablePrint()
+		# print(hqp.time_taken)
+		# comp_time.append(hqp.time_taken)
+		# blockPrint()
+		# q_dot1_sol = sol.value(q_dot1)
+		# q_dot2_sol = sol.value(q_dot2)
+		# s_dot1_sol = sol.value(s_dot1)
+		# s_dot2_sol = sol.value(s_dot2)
+		# con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
+		# constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
 
 
 		#sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
-		# q_opt = q_opt.full()
-		# q_dot_opt = q_dot_opt.full()
-		# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
+		q_opt = q_opt.full()
+		q_dot_opt = q_dot_opt.full()
+		# sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
 		# sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-		# # # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
+		sol_cqp = hqp.solve_cascadedQP4(q_opt, q_dot_opt, warm_start = True)
+		# # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 		# sol = sol_cqp[4]
-		# # # print(var_dot.shape)
-		# # # var_dot = chqp_optis[4][3]
+		sol = sol_cqp[5]
+
+		# # print(var_dot.shape)
+		# # var_dot = chqp_optis[4][3]
 		# var_dot_sol = sol.value(hqp.cHQP_xdot[4])
-		# enablePrint()
-		# print(hqp.time_taken)
-		# # # comp_time.append(hqp.time_taken)
-		# # # blockPrint()
-		# q_dot1_sol = var_dot_sol[0:7]
-		# q_dot2_sol = var_dot_sol[8:15]
-		# s_dot1_sol = var_dot_sol[7]
-		# s_dot2_sol = var_dot_sol[15]
+		var_dot_sol = sol.value(hqp.cHQP_xdot[5])
+		enablePrint()
+		# print(var_dot_sol)
+		# print(var_dot_sol2)
+
+		print(hqp.time_taken)
+		# # comp_time.append(hqp.time_taken)
+		# # blockPrint()
+		q_dot1_sol = var_dot_sol[0:7]
+		q_dot2_sol = var_dot_sol[8:15]
+		s_dot1_sol = var_dot_sol[7]
+		s_dot2_sol = var_dot_sol[15]
 
 		# sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 1.5)
 		# max_err = cs.fmax(max_err, cs.norm_1(sol_h.value(cs.vertcat(q_dot1, s_dot1, q_dot2, s_dot2)) - var_dot_sol))

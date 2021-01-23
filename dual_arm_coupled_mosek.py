@@ -171,6 +171,7 @@ if __name__ == '__main__':
 	q_dot_opt_history = q_dot_opt
 	hlp.compute_matrices(cs.DM([0]*17), q_opt)
 	hlp.configure_weighted_problem()
+	hlp.configure_sequential_problem()
 	# hqp.time_taken = 0
 	tic = time.time()
 
@@ -205,21 +206,27 @@ if __name__ == '__main__':
 	max_err = 0;
 	# hqp.once_solved = False
 	no_times_exceeded = 0
-	hlp.solve_weighted_method([10,5,2,1,0.01])
-	print("Optimal q_dot = " + str(hlp.Mw_dict['x'].level()) )
+	hlp.solve_weighted_method([1,1,1,1])
+	hlp.solve_sequential_problem()
+	# print(hlp.time_taken)
+	# print("Optimal q_dot = " + str(hlp.Mw_dict['x'].level()) )
 	comp_time.append(hlp.Mw.getSolverDoubleInfo("simTime"))
 	simplex_iters.append(hlp.Mw.getSolverIntInfo("simPrimalIter"))
 	print("First solve time is = " + str(hlp.Mw.getSolverDoubleInfo("simTime")))
-
-	sequential_method = False
+	q_zero_integral = 0
+	q_1_integral = 0
+	q_2_integral = 0
+	sequential_method = True
 	for i in range(1000): #range(math.ceil(T/ts)):
 		counter += 1
 		# hqp.time_taken = 0
 		print("iter :" + str(i))
 		print(hlp.Mw_dict[4]['eq_b'].getValue())
 		if not sequential_method:
-			hlp.solve_weighted_method([20000,5000,50,0.1*10,0.001])
+			hlp.solve_weighted_method([150,150,150,150])
 			var_dot_sol = hlp.Mw_dict['x'].level()
+
+
 			# sol = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
 			q_dot1_sol = var_dot_sol[0:7]
 			q_dot2_sol = var_dot_sol[7:14]
@@ -237,7 +244,7 @@ if __name__ == '__main__':
 			# sol_time = hlp.Mw.getSolverDoubleInfo("optimizerTime")
 			sol_time = hlp.Mw.getSolverDoubleInfo("simPrimalTime") + hlp.Mw.getSolverDoubleInfo("simDualTime")
 			simplex_iters.append(hlp.Mw.getSolverIntInfo("simPrimalIter") + hlp.Mw.getSolverIntInfo("simDualIter"))
-			print("Solver time is = " + str(sol_time))
+			# print("Solver time is = " + str(sol_time))
 			# print("Solver time is = " + str(hlp.Mw.getSolverDoubleInfo("simTime")))
 			# print("q_torso_dot = "+str(q_torso_dot_sol))
 			comp_time.append(sol_time)
@@ -246,38 +253,31 @@ if __name__ == '__main__':
 
 		#sol = hqp.solve_adaptive_hqp2(q_opt, q_dot_opt, gamma_init = 0.2)
 		if sequential_method:
-			q_dot_opt = q_dot_opt.full()
-			q_opt = q_opt.full()
-			# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
-			sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-			# sol_cqp = hqp.solve_cascadedQP_L2(q_opt, q_dot_opt)#, solver = 'ipopt')
-			# # # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
-			sol = sol_cqp[4]
-			# # # print(var_dot.shape)
-			# # # var_dot = chqp_optis[4][3]
-			var_dot_sol = sol.value(hqp.cHQP_xdot[4])
-			enablePrint()
-			print(hqp.time_taken)
-			# # comp_time.append(hqp.time_taken)
-			# # blockPrint()
+			hlp.solve_sequential_problem()
+			var_dot_sol = hlp.Mdict_seq[5]['x'].level()
 			q_dot1_sol = var_dot_sol[0:7]
-			q_dot2_sol = var_dot_sol[8:15]
-			s_dot1_sol = var_dot_sol[7]
+			q_dot2_sol = var_dot_sol[7:14]
+			s_dot1_sol = var_dot_sol[14]
 			s_dot2_sol = var_dot_sol[15]
 			q_torso_dot_sol = var_dot_sol[16]
-			# sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 1.5)
-			# max_err = cs.fmax(max_err, cs.norm_1(sol_h.value(cs.vertcat(q_dot1, s_dot1, q_dot2, s_dot2)) - var_dot_sol))
-			# enablePrint()
-			# print(max_err)
-			# if cs.norm_1(sol_h.value(cs.vertcat(q_dot1, s_dot1, q_dot2, s_dot2)) - var_dot_sol) >= 1e-4:
-			# 	no_times_exceeded += 1
-			# blockPrint()
-			#Computing the constraint violations
+
+			print("Solver time is = " + str(hlp.time_taken))
+			comp_time.append(hlp.time_taken)
+			con_viol1 = hlp.optimal_slacks[1]
+			con_viol2 = hlp.optimal_slacks[2]
+			con_viol3 = hlp.optimal_slacks[3]
+			con_viol4 = hlp.optimal_slacks[4]
+			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(con_viol1, con_viol2, con_viol3, con_viol4))
 
 		# print(con_viols)
 		# print(q_opt)
 		# print(s2_opt)
-
+		number_non_zero = sum(cs.fabs(q_dot1_sol) >=  1e-3) + sum(cs.fabs(q_dot2_sol) >=  1e-3)
+		q_zero_integral += number_non_zero*ts
+		q_2_integral += (cs.sumsqr(q_dot1_sol) + cs.sumsqr(q_dot2_sol))*ts
+		q_1_integral += sum(cs.fabs(q_dot1_sol).full() + cs.fabs(q_dot2_sol).full())*ts
+		#compute q_1_integral
+		# print(number_non_zero)
 		#Update all the variables
 		q_dot_opt = cs.vertcat(q_dot1_sol, q_dot2_sol, s_dot1_sol,  s_dot2_sol, q_torso_dot_sol)
 		q_opt[0:17] += ts*q_dot_opt
@@ -335,19 +335,21 @@ if __name__ == '__main__':
 
 	# # print(q_pi_history[-1])
 	# print(q_opt_history[:,-1])
-
+	print("Total average number of actuators used = " + str(q_zero_integral/5))
+	print("Total average number of L2  = " + str(q_2_integral/5))
+	print("Total average number of L1 = " + str(q_1_integral/5))
 	#Implementing solution by Hierarchical QP
-	figure()
-	plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
-	plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
-	plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
-	plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
-	title("Constraint violations")
-	xlabel("Time step (Control sampling time = 0.005s)")
-	legend()
+	# figure()
+	# plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
+	# plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
+	# plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
+	# plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
+	# title("Constraint violations")
+	# xlabel("Time step (Control sampling time = 0.005s)")
+	# legend()
 
-	figure()
-	plot(list(range(counter)), q_dot_opt_history.full().T)
+	# figure()
+	# plot(list(range(counter)), q_dot_opt_history.full().T)
 	# plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
 	# #
 	title("joint_velocities")
@@ -362,13 +364,13 @@ if __name__ == '__main__':
 	xlabel("No of samples in the horizon (sampling time = 0.05s)")
 	ylabel('Time (s)')
 
-	figure()
-	plot(list(range(counter)), simplex_iters)
+	# figure()
+	# plot(list(range(counter)), simplex_iters)
 	# # plot(horizon_sizes, list(average_solver_time_average_L2.values()), label = 'L2 penalty')
 	# #
-	title("Number of simplex iterations")
-	xlabel("No of samples in the horizon (sampling time = 0.05s)")
-	ylabel('Time (s)')
+	# title("Number of simplex iterations")
+	# xlabel("No of samples in the horizon (sampling time = 0.05s)")
+	# ylabel('Time (s)')
 
 	# figure()
 	# plot(list(range(counter-1)), q_opt_history.full().T)

@@ -4,47 +4,57 @@ import matplotlib.pyplot as plt
 from pylab import *
 
 #Load the json data
-with open('comp_time_l1_weighted_warm_start2.txt', 'r') as fp:
-	weighted_warm_start = json.load(fp)
+with open('comp_time_mosek_slp.txt', 'r') as fp:
+	comp_time_mosek_slp = json.load(fp)
 
-with open('comp_time_weighted_mosek.txt', 'r') as fp:
+with open('comp_time_weighted_mosek2.txt', 'r') as fp:
 	weighted_warm_start_mosek = json.load(fp)
 
 with open('comp_time_l1_weighted_nowarm_start.txt', 'r') as fp:
 	weighted_nowarm_start = json.load(fp)
 
-with open('comp_time_seq_no_warm_start.txt', 'r') as fp:
-	seq_no_warm_start = json.load(fp)
+with open('cascQP_dualarm_coupled.txt', 'r') as fp:
+	casQP_warm_start = json.load(fp)
 
-with open('comp_time_weighted_adaptive.txt', 'r') as fp:
+with open('comp_time_slp_dual_arm_coupled.txt', 'r') as fp:
+ 	seq_no_warm_start = json.load(fp)
+
+with open('dual_arm_coupled_wlp_qpoases.txt', 'r') as fp:
 	weighted_adaptive_warm_start = json.load(fp)
 
 time_step = 0.005
 
-t_weighted_nw = weighted_nowarm_start['comp_time']
-t_axis1 = np.array(range(len(t_weighted_nw)))*0.005
+# t_weighted_nw = weighted_nowarm_start['comp_time']
+# t_axis1 = np.array(range(len(t_weighted_nw)))*0.005
 
 figure()
-plot(t_axis1, t_weighted_nw, label = 'weighted-qpoases')
+t_seq = casQP_warm_start['comp_time']
+t_axis3 = np.array(range(len(t_seq)))*0.005
+plot(t_axis3, t_seq, label = 'cascadedQP-qpoases')
 
 t_seq = seq_no_warm_start['comp_time']
 t_axis3 = np.array(range(len(t_seq)))*0.005
-plot(t_axis3, t_seq, label = 'sequential-qpoases')
+plot(t_axis3, t_seq, label = 'slp-l2-qpoases')
 
-t_weighted_w = weighted_warm_start['comp_time']
+t_weighted_w = comp_time_mosek_slp['comp_time']
 t_axis2 = np.array(range(len(t_weighted_w)))*0.005
-plot(t_axis2, t_weighted_w, label = 'weighted-warmstart-qpoases')
+plot(t_axis2, t_weighted_w, label = 'slp-l1-mosek')
 
+#adaptive
 t_weighted_adaptive = weighted_adaptive_warm_start['comp_time']
 t_axis2 = np.array(range(len(t_weighted_adaptive)))*0.005
-plot(t_axis2, t_weighted_adaptive, label = 'weighted-adaptive-warmstart-qpoases')
+plot(t_axis2, t_weighted_adaptive, label = 'wlp-l2-adaptive-qpoases')
 
 t_weighted_mosek = weighted_warm_start_mosek['comp_time']
 t_axis2 = np.array(range(len(t_weighted_mosek)))*0.005
-plot(t_axis2, t_weighted_mosek, label = 'weighted-warmstart-mosek')
+plot(t_axis2, t_weighted_mosek, label = 'wlp-l1-mosek')
+
+t_lexlsi=np.array([82,33,31,38,36,34,34,33,34,31,31,36,33,32,31,33,36,34,31,31,31,36,33,35,31,32,37,34,32,33,31,37,32,33,31,33,38,34,32,32,31,36,33,32,31,32,37,49,31,32,31,35,34,31,34,33,37,33,30,32,31,85,40,31,31,30,31,33,31,30,31,32,33,32,30,31,31,32,31,31,31,30,35,32,31,30,30,32,33,32,31,31,31,33,31,47,31,30,35,31,30,32,31,36,33,31,31,30,36,33,31,33,30,36,32,32,30,30,35,35,30,30,32,31,32,30,30,29,31,33,31,30,31,42,33,31,32,31,30,34,32,31,31,31,37,32,31,31,31,32,33,31,31,32,31,33,31,31,31,31,34,31,31,32,31,32,31,32,30,31,33,32,31,31,30,34,31,31,30,31,41,33,30,32,31,32,34,31,31,31,30,33,30,31,30,31,33,32,30,31,31,33,31,30,29,31,34,32,31,32,33,35,33,32,30,30,31,34,31,31,31,31,34,33,33,34,33,34,33,32,32,33,33,31,30,30,31,33,32,30,31,31,36,32,33,34,33,88,76,31,30,30,30,33,31,30,31,31,33,31,31,31,31,33,32,32,31,31,33,35,30,30,31,36,32,31,29,30,32,33,32,30,31,31,33,32,31,30,33,33,32,30,30,31,33,32,31,30,31,35,32,31,29,41,32,32,36,30,30,31,33,31,30,30,30,33,31,31,30,31,33,31,30,33,33,34,32,33,33,34,38,32,31,30,30,31,33,31,31,30,30,33,31,30,30,32,33,32,31,31,31,37,33,30,30,30,37,33,31,30,31,33,33,31,31,33,32,33,30,31,30,31,32,31,31,30,30,33,31,31,30,31,32,32,31,30,32,37,32,31,31,30,31,33,31,30,30,30,33,31,30,30,31,33,31,30,30,32,33,31,32,32,30,36,34,31,30,31,30,33,31,30,31,31,34,31,31,30,30,33,31,30,30,31,33,32,30,31,31,36,34,31,30,31,30,33,32,30,30,31,33,31,30,30,31,32,31,31,30,30,33,31,31,30,31,32,81,31,30,31,30,34,32,32,30,31,33,32,30,30,31,34,31,31,30,31,38,33,31,30,31,36,32,32,31,31,39,35,32,31,36,32,33,31,31,32,32,33,30,31,30,30,33,31,31,31,31,33,32,32,32,31,33,33,30,31,31,35,32,30,30,30,31,33,31,30,30,30,33,31,30,30,30,33,32,31,31,30,33,31,31,31,31,36,32,30,30,30,83,82,31,30,30,31,33,32,30,31,30,33,31,31,32,31,34,30,30,30,31,33,31,30,29,30,31,31,30,30,29,30,32,31,30,30,30,33,32,30,31,31,33,31,32,30,32,38,33,31,30,30,34,34,31,37,30,32,33,31,30,30,31,33,32,30,30,30,33,31,31,30,31,33,31,30,30,31,37,33,31,31,37,31,32,32,31,30,30,33,33,30,31,30,33,32,31,31,31,34,31,31,30,31,35,33,31,30,30,31,33,31,31,32,32,32,32,30,32,30,32,32,31,30,30,32,30,29,30,31,35,32,30,49,29,29,32,30,30,30,30,33,32,31,31,30,33,31,30,30,31,32,32,31,31,31,35,32,30,30,33,32,32,30,30,30,31,32,32,33,33,32,33,31,31,31,30,34,32,30,30,31,36,31,30,31,31,39,33,31,32,31,36,35,32,31,31,36,33,32,31,31,33,32,31,30,30,31,33,32,31,30,31,32,31,30,30,31,33,33,31,31,32,35,31,31,32,31,34,32,31,31,30,31,33,31,31,31,31,32,32,31,30,31,32,32,31,30,31,33,31,30,31,32,35,32,30,30,30,30,33,31,30,30,30,33,319,31,30,31,33,32,32,43,87,33,32,30,32,31,36,32,31,192,48,49,33,31,37,31,31,34,47,31,31,58,34,33,32,32,31,33,32,31,32,32,37,33,32,32,32,38,34,32,32,33,38,33,32,32,40,32,34,33,32,31,32,35,32,31,32,138,34,32,32,32,32,34,32,32,31,32,38,33,32,32,31,34,40,33,31,31,32,34,32,31,32,31,34,32,32,50,33,35,32,31,31,33,35,32,32,32,32,38,33,32,50,31,32,33,32,31,32,31,34,48,30,30,31,32,31,31,31,30,33,47,30,29,31,35,32,31,31,32,36,32,30,31,30,30,34,31,31,30,32,33,31,31,30,31,33,31,30,30,31,33,31,31,31,32,37,34,31,30,30,32,33,30,31,29,30,33])*1e-6
+t_axis2 = np.array(range(len(t_lexlsi)))*0.005
+plot(t_axis2, t_lexlsi, label = 'lexlsi (hqp)')
 
 legend()
-title("Computation time comparison between sequential and weighted method for robot control")
+title("Computation times of different solvers")
 xlabel("Time(s)")
 ylabel('Computation time(s)')
 plt.yscale('log')

@@ -36,6 +36,7 @@ class hqp:
 		self.once_solved = False
 		self.chqp_warm_start_x = {}
 		self.chqp_warm_start_lam = {}
+		self.cqp_not_initialized = True
 	def activate_cascadedHQP(priority_levels):
 		""" Should be activated before creating any variables or adding any constraints"""
 		cHQP = []
@@ -487,6 +488,8 @@ class hqp:
 			variables0 = opti.parameter(len(variable_values), 1)
 			opti.set_value(variables0, variable_values)
 			opti.set_initial(variables_dot, variable_dot_values)
+			# if priority > 1:
+				# opti.set_initial(variables_dot, sol_cqp[priority - 1].value(self.cHQP_xdot[priority - 1]))
 
 			#Adding the highest priority constraints
 			constraint_expression = self.constraint_expression_funs[0](variables0, variables_dot)
@@ -716,26 +719,27 @@ class hqp:
 
 	# The same as cascadedQP3, but now the optimization problem is generated only once. And warm starting is used,
 	# to get a good idea of the difference in the computational effort.
-
-	def solve_cascadedQP4(self, variable_values, variable_dot_values):
-
+	def solve_cascadedQP4(self, variable_values, variable_dot_values, solver = 'qpoases', warm_start = False):
 		blockPrint()
+		# enablePrint()
 		sol_cqp = {}
-		gain = 1000 #just set some value for the L1 penalty on task constraints
+		gain = 1 #just set some value for the L1 penalty on task constraints
 		number_priorities = len(self.slacks)
+		chqp_warm_start_x = self.chqp_warm_start_x
+		chqp_warm_start_lam = self.chqp_warm_start_lam
 		self.time_taken = 0
 		self.cHQP_xdot = {}
+		self.cHQP_slacks = {}
 		casc_QP_slack_sols = {}
-		# print(self.slacks)
-		for priority in range(1, number_priorities + 1):
-			# print("solving for priority level = " + str(priority))
-			if priority not in self.cHQP_optis:
+		if self.cqp_not_initialized:
+			self.cqp_instances = {}
+			self.cqp_not_initialized = False
+			for priority in range(1, number_priorities + 1):
+				# print("solving for priority level = " + str(priority))
 				opti = cs.Opti()
-				variables_dot = opti.variable(variable_dot_values.shape[0], 1)
-				variables0 = opti.parameter(variable_values.shape[0], 1)
-				opti.set_value(variables0, variable_values)
-				opti.set_initial(variables_dot, variable_dot_values)
-
+				variables_dot = opti.variable(len(variable_dot_values), 1)
+				variables0 = opti.parameter(len(variable_values), 1)
+				con_sol_dict = {}
 				#Adding the highest priority constraints
 				constraint_expression = self.constraint_expression_funs[0](variables0, variables_dot)
 				constraint_type = self.constraint_type[0]
@@ -752,124 +756,258 @@ class hqp:
 					else:
 						opti.subject_to(constraint_options_lb[k] <= (constraint_expression[k] <= constraint_options_ub[k]))
 
-				constraints_sols_params_dict = {} #store the MX symbolic variables for the slack variable relaxation parameters
-				if priority >= 1:
-
-					#create the hard constraits for the constraints from the previous levels
-
-					for j in range(1,priority):
-						#compute solution of constraints from this level from
-						#the most recent qp sol
-						constraint_expression = self.constraint_expression_funs[j](variables0, variables_dot)
-						constraint_type = self.constraint_type[j]
-						constraint_options_ub = self.constraint_options_ub[j]
-						constraint_options_lb = self.constraint_options_lb[j]
-						casc_QP_slack_sols[j] = cs.DM(casc_QP_slack_sols[j])
-						constraints_sol_params = opti.parameter(cs.DM(casc_QP_slack_sols[j]).shape[0])
-						constraints_sols_params_dict[j] = constraints_sol_params
-						#check if the constraint is active and make it a hard constraint
-						for k in range(constraint_expression.shape[0]):
-							#if equality constraint, always active
-							if constraint_type[k] == 'equality':
-								opti.subject_to(-constraints_sol_params[k] <= (constraint_expression[k] <= constraints_sol_params[k]))
-							#else check if active
-							elif constraint_type[k] == 'lb':
-								opti.subject_to(constraint_options_lb[k] - constraints_sol_params[k] <= constraint_expression[k])
-							elif constraint_type[k] == 'ub':
-								opti.subject_to(constraint_expression[k] <= constraint_options_ub[k] + constraints_sol_params[k])
-							else:
-								opti.subject_to(constraint_options_lb[k] - constraints_sol_params[k] <= (constraint_expression[k] <= constraint_options_ub[k] + constraints_sol_params[k]))
-
-					#creating slack variables and setting constraints for this level
-					constraint_expression = self.constraint_expression_funs[priority](variables0, variables_dot)
-					constraint_type = self.constraint_type[priority]
-					constraint_options_ub = self.constraint_options_ub[priority]
-					constraint_options_lb = self.constraint_options_lb[priority]
+				#create the hard constraits for the constraints from the previous levels
+				for j in range(1,priority):
+					#compute solution of constraints from this level from
+					#the most recent qp sol
+					constraint_expression = self.constraint_expression_funs[j](variables0, variables_dot)
+					constraint_type = self.constraint_type[j]
+					constraint_options_ub = self.constraint_options_ub[j]
+					constraint_options_lb = self.constraint_options_lb[j]
+					constraints_sol = opti.parameter(constraint_expression.shape[0])
+					con_sol_dict[j] = constraints_sol
 					slacks_now = opti.variable(constraint_expression.shape[0], 1)
 					opti.subject_to(slacks_now >= 0)
+					#check if the constraint is active and make it a hard constraint
 					for k in range(constraint_expression.shape[0]):
 						#if equality constraint, always active
 						if constraint_type[k] == 'equality':
 							opti.subject_to(-slacks_now[k] <= (constraint_expression[k] <= slacks_now[k]))
-						#else check if active
 						elif constraint_type[k] == 'lb':
 							opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= constraint_expression[k])
 						elif constraint_type[k] == 'ub':
 							opti.subject_to(constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k])
 						else:
 							opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= (constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k]))
+						opti.subject_to(np.ones(slacks_now.shape).T@slacks_now <= np.ones(slacks_now.shape).T@constraints_sol)
+							# opti.subject_to(slacks_now <= constraints_sol)
 
-					#set weights only for the constraints of this particular priority level
-					constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
-					obj = 0
-					for j in range(constraints.shape[0]):
-						weight = gain/cs.norm_1(constraints[j, :])
-						obj += 1000*slacks_now[j]
+				#creating slack variables and setting constraints for this level
+				constraint_expression = self.constraint_expression_funs[priority](variables0, variables_dot)
+				constraint_type = self.constraint_type[priority]
+				constraint_options_ub = self.constraint_options_ub[priority]
+				constraint_options_lb = self.constraint_options_lb[priority]
+				slacks_now = opti.variable(constraint_expression.shape[0], 1)
+				opti.subject_to(slacks_now >= 0)
+				for k in range(constraint_expression.shape[0]):
+					#if equality constraint, always active
+					if constraint_type[k] == 'equality':
+						opti.subject_to(-slacks_now[k] <= (constraint_expression[k] <= slacks_now[k]))
+						#else check if active
+					elif constraint_type[k] == 'lb':
+						opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= constraint_expression[k])
+					elif constraint_type[k] == 'ub':
+						opti.subject_to(constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k])
+					else:
+						opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= (constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k]))
 
-					opti.minimize(obj + cs.sumsqr(variables_dot)*1e-6)
-					#solve the QP for this priority level
-					# print(opti.p.shape)
-					# print(self.opti.p.shape)
-					# enablePrint()
-				# p_opts = {"expand":True}
-				# s_opts = {"max_iter": 100, 'hessian_approximation':'limited-memory', 'limited_memory_max_history' : 5, 'tol':1e-6}
-				# opti.solver("ipopt", p_opts, s_opts)
-				qpsol_options = {'error_on_fail':False}
-				opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'qpsol_options': qpsol_options,  'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
-
-				self.cHQP_optis[priority] = [opti, slacks_now, constraints_sols_params_dict, variables_dot]
-
-			enablePrint()
-			print("\n\n\n Solving for priority level " + str(priority) + " \n\n\n")
-			opti = self.cHQP_optis[priority][0]
-			variables_dot = self.cHQP_optis[priority][3]
-			slacks_now = self.cHQP_optis[priority][1]
-
-			if priority >= 2:
-				constraints_sols_params_dict = self.cHQP_optis[priority][2]
-				for j in range(1,priority):
-					opti.set_value(constraints_sols_params_dict[j], casc_QP_slack_sols[j])
-			tic = time.time()
-			sol = opti.solve()
-			self.time_taken += time.time() - tic
-			if priority >= 1:
-				casc_QP_slack_sols[priority] = sol.value(slacks_now)
-				self.cHQP_slacks[priority] = slacks_now
-				self.cHQP_xdot[priority] = variables_dot
-			blockPrint()
-
-			try:
-				opti = self.cHQP_optis[priority][0]
-				variables_dot = self.cHQP_optis[priority][3]
-				slacks_now = self.cHQP_optis[priority][1]
 				#set weights only for the constraints of this particular priority level
-				constraints = self.constraint_funs[priority](variable_values, variable_dot_values)
-				obj = 0
-				for j in range(constraints.shape[0]):
-					weight = gain/cs.norm_1(constraints[j, :])
-					obj += weight*slacks_now[j]
+				weights = opti.parameter(constraint_expression.shape[0])
+				obj = weights.T@slacks_now
 
-				opti.minimize(obj + cs.sumsqr(variables_dot)*1e-6)
-				if priority >= 2:
-					constraints_sols_params_dict = self.cHQP_optis[priority][2]
-					for j in constraints_sols_params_dict:
-						opti.set_value(constraints_sols_params_dict[j], casc_QP_slack_sols[j])
-				tic = time.time()
-				# sol = opti.solve()
-				self.time_taken += time.time() - tic
-				if priority >= 1:
-					slacks_now = self.cHQP_optis[priority][1]
-					casc_QP_slack_sols[priority] = cs.fabs(sol.value(slacks_now))
-					self.cHQP_slacks[priority] = slacks_now
-					self.cHQP_xdot[priority] = variables_dot
+				if priority == self.number_priorities:
+					obj += cs.sumsqr(variables_dot)*1e-6
+				opti.minimize(obj)
+				if solver == 'qpoases':
+					qpsol_options = {'error_on_fail':False}
+					opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'qpsol_options': qpsol_options,  'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
+				else:
+					opti.solver("ipopt",{"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
+
+				self.cqp_instances[priority] = {}
+				self.cqp_instances[priority]['opti'] = opti
+				self.cqp_instances[priority]['weight'] = weights
+				self.cqp_instances[priority]['variables0'] = variables0
+				self.cqp_instances[priority]['constraints_sol'] = con_sol_dict
+				self.cqp_instances[priority]['slacks_now'] = slacks_now
+				self.cqp_instances[priority]['variables_dot'] = variables_dot
+
+
+
+		for i in range(1, number_priorities + 1):
+			opti = self.cqp_instances[i]['opti']
+			weights = self.cqp_instances[i]['weight']
+			variables0 = self.cqp_instances[i]['variables0']
+			con_sol_dict = self.cqp_instances[i]['constraints_sol']
+			slacks_now = self.cqp_instances[i]['slacks_now']
+			variables_dot = self.cqp_instances[i]['variables_dot']
+			opti.set_value(variables0, variable_values)
+
+			for j in range(1, i):
+				#set the constraints sol for each
+				opti.set_value(con_sol_dict[j], casc_QP_slack_sols[j])
+			constraints = self.constraint_funs[i](variable_values, variable_dot_values)
+			for k in range(constraints.shape[0]):
+				weight = 1/cs.norm_1(constraints[k, :])
+				# print(weight)
+				opti.set_value(weights[k], weight)
+			blockPrint()
+			tic = time.time()
+			# sol = opti.solve()
+			if warm_start and self.once_solved:
+				opti.set_initial(opti.x, chqp_warm_start_x[i])
+				opti.set_initial(opti.lam_g, chqp_warm_start_lam[i])
+			try:
+				sol = opti.solve()
+				chqp_warm_start_x[i] = sol.value(opti.x)
+				chqp_warm_start_lam[i] = sol.value(opti.lam_g)
+				self.time_taken += sol.stats()['t_wall_total']#time.time() - tic
+				casc_QP_slack_sols[i] = sol.value(slacks_now)
+				self.cHQP_slacks[i] = slacks_now
+				self.cHQP_xdot[i] = variables_dot
 			except:
 				return False
-				break
 			# cHQP[priority] = opti
-			sol_cqp[priority] = sol
+			sol_cqp[i] = sol
+		self.once_solved = True
+		return sol_cqp
 
-		enablePrint()
-		return sol_cqp, self.cHQP_optis
+	def solve_cascadedQP_L2_warmstart(self, variable_values, variable_dot_values, solver = 'qpoases', warm_start = False):
+		blockPrint()
+		# enablePrint()
+		sol_cqp = {}
+		gain = 1 #just set some value for the L1 penalty on task constraints
+		number_priorities = len(self.slacks)
+		chqp_warm_start_x = self.chqp_warm_start_x
+		chqp_warm_start_lam = self.chqp_warm_start_lam
+		self.time_taken = 0
+		self.cHQP_xdot = {}
+		self.cHQP_slacks = {}
+		casc_QP_slack_sols = {}
+		if self.cqp_not_initialized:
+			self.cqp_instances = {}
+			self.cqp_not_initialized = False
+			for priority in range(1, number_priorities + 1):
+				# print("solving for priority level = " + str(priority))
+				opti = cs.Opti()
+				variables_dot = opti.variable(len(variable_dot_values), 1)
+				variables0 = opti.parameter(len(variable_values), 1)
+				con_sol_dict = {}
+				#Adding the highest priority constraints
+				constraint_expression = self.constraint_expression_funs[0](variables0, variables_dot)
+				constraint_type = self.constraint_type[0]
+				constraint_options_ub = self.constraint_options_ub[0]
+				constraint_options_lb = self.constraint_options_lb[0]
+				for k in range(constraint_expression.shape[0]):
+					#if equality constraint, always active
+					if constraint_type[k] == 'equality':
+						opti.subject_to(constraint_expression[k] == 0)
+					elif constraint_type[k] == 'lb':
+						opti.subject_to(constraint_options_lb[k] <= constraint_expression[k])
+					elif constraint_type[k] == 'ub':
+						opti.subject_to(constraint_expression[k] <= constraint_options_ub[k])
+					else:
+						opti.subject_to(constraint_options_lb[k] <= (constraint_expression[k] <= constraint_options_ub[k]))
+
+				#create the hard constraits for the constraints from the previous levels
+				for j in range(1,priority):
+					#compute solution of constraints from this level from
+					#the most recent qp sol
+					constraint_expression = self.constraint_expression_funs[j](variables0, variables_dot)
+					constraint_type = self.constraint_type[j]
+					constraint_options_ub = self.constraint_options_ub[j]
+					constraint_options_lb = self.constraint_options_lb[j]
+					constraints_sol = opti.parameter(constraint_expression.shape[0])
+					con_sol_dict[j] = constraints_sol
+					slacks_now = opti.variable(constraint_expression.shape[0], 1)
+					opti.subject_to(slacks_now >= 0)
+					#check if the constraint is active and make it a hard constraint
+					for k in range(constraint_expression.shape[0]):
+						#if equality constraint, always active
+						if constraint_type[k] == 'equality':
+							opti.subject_to( - constraints_sol[k] <= (constraint_expression[k] <=  constraints_sol[k]))
+						elif constraint_type[k] == 'lb':
+							opti.subject_to(constraint_options_lb[k]  <= constraint_expression[k] + constraints_sol[k])
+						elif constraint_type[k] == 'ub':
+							opti.subject_to(constraint_expression[k] <= constraint_options_ub[k] + constraints_sol[k])
+						else:
+							opti.subject_to(constraint_options_lb[k] - constraints_sol[k] <= (constraint_expression[k] <= constraints_sol[k] + constraint_options_ub[k] ))
+						# opti.subject_to(np.ones(slacks_now.shape).T@slacks_now <= np.ones(slacks_now.shape).T@constraints_sol)
+							# opti.subject_to(slacks_now <= constraints_sol)
+
+				#creating slack variables and setting constraints for this level
+				constraint_expression = self.constraint_expression_funs[priority](variables0, variables_dot)
+				constraint_type = self.constraint_type[priority]
+				constraint_options_ub = self.constraint_options_ub[priority]
+				constraint_options_lb = self.constraint_options_lb[priority]
+				slacks_now = opti.variable(constraint_expression.shape[0], 1)
+				#set weights only for the constraints of this particular priority level
+				obj = 0
+				weights = opti.parameter(constraint_expression.shape[0])
+				opti.subject_to(slacks_now >= 0)
+				for k in range(constraint_expression.shape[0]):
+					#if equality constraint, always active
+					obj += weights[k]*slacks_now[k]**2
+					if constraint_type[k] == 'equality':
+						opti.subject_to(-slacks_now[k] <= (constraint_expression[k] <= slacks_now[k]))
+						#else check if active
+					elif constraint_type[k] == 'lb':
+						opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= constraint_expression[k])
+					elif constraint_type[k] == 'ub':
+						opti.subject_to(constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k])
+					else:
+						opti.subject_to(constraint_options_lb[k] - slacks_now[k] <= (constraint_expression[k] <= constraint_options_ub[k] + slacks_now[k]))
+
+
+
+
+
+				if priority == self.number_priorities:
+					obj += cs.sumsqr(variables_dot)*1e-6
+				opti.minimize(obj)
+				if solver == 'qpoases':
+					qpsol_options = {'error_on_fail':False}
+					opti.solver("sqpmethod", {"expand":True, "qpsol": 'qpoases', 'qpsol_options': qpsol_options,  'print_iteration': True, 'print_header': True, 'print_status': True, "print_time":True, 'max_iter': 1000})
+				else:
+					opti.solver("ipopt",{"expand":True, 'ipopt':{'tol':1e-6, 'print_level':0}})
+
+				self.cqp_instances[priority] = {}
+				self.cqp_instances[priority]['opti'] = opti
+				self.cqp_instances[priority]['weight'] = weights
+				self.cqp_instances[priority]['variables0'] = variables0
+				self.cqp_instances[priority]['constraints_sol'] = con_sol_dict
+				self.cqp_instances[priority]['slacks_now'] = slacks_now
+				self.cqp_instances[priority]['variables_dot'] = variables_dot
+
+
+
+		for i in range(1, number_priorities + 1):
+			opti = self.cqp_instances[i]['opti']
+			weights = self.cqp_instances[i]['weight']
+			variables0 = self.cqp_instances[i]['variables0']
+			con_sol_dict = self.cqp_instances[i]['constraints_sol']
+			slacks_now = self.cqp_instances[i]['slacks_now']
+			variables_dot = self.cqp_instances[i]['variables_dot']
+			opti.set_value(variables0, variable_values)
+
+			for j in range(1, i):
+				#set the constraints sol for each
+				opti.set_value(con_sol_dict[j], casc_QP_slack_sols[j])
+			constraints = self.constraint_funs[i](variable_values, variable_dot_values)
+			for k in range(constraints.shape[0]):
+				weight = 1/cs.norm_1(constraints[k, :])
+				# print(weight)
+				opti.set_value(weights[k], weight)
+			blockPrint()
+			tic = time.time()
+			# sol = opti.solve()
+			if warm_start and self.once_solved:
+				opti.set_initial(opti.x, chqp_warm_start_x[i])
+				opti.set_initial(opti.lam_g, chqp_warm_start_lam[i])
+			try:
+				sol = opti.solve()
+				chqp_warm_start_x[i] = sol.value(opti.x)
+				chqp_warm_start_lam[i] = sol.value(opti.lam_g)
+				self.time_taken += sol.stats()['t_wall_total']#time.time() - tic
+				casc_QP_slack_sols[i] = cs.fabs(sol.value(slacks_now))
+				self.cHQP_slacks[i] = slacks_now
+				self.cHQP_xdot[i] = variables_dot
+			except:
+				return False
+			# cHQP[priority] = opti
+			sol_cqp[i] = sol
+		self.once_solved = True
+		return sol_cqp
 
 
 
@@ -1310,6 +1448,11 @@ class hqp:
 						print(gamma_temp)
 						# sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_temp)
 						sol_test = self.solve_HQPl1(variable_values, variable_dot_values, gamma_init, gamma_limit = pl)
+						if not sol:
+							if once_ran:
+								return sol_old, hierarchy_failure
+							else:
+								return sol, hierarchy_failure
 						con_viol_test = np.array(sol_test.value(self.slacks[pl]))
 						for pl_h in range(1,pl):
 							if cs.norm_1(sol_test.value(self.slacks[pl_h])) >= cs.norm_1(constraint_violations[pl_h]) + 1e-6:
