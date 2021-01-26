@@ -9,7 +9,9 @@ Documentation coming soon to improve readability of the code.
 
 ## Videos of experiments from the paper
 
+### Dual arm control with WLP-L1 algorithm
 ![Dual arm control with WLP-L1 algorithm](videos/dual_arm_table_wlpl1.gif)
+### Dual arm control with WLP-L2 algorithm
 ![Dual arm control with WLP-L2 algorithm](videos/dual_arm_table_wlpl2.gif)
 
 ## Duality trick reformulation:
