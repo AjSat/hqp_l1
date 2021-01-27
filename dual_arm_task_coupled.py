@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
 	hqp = hqp()
 
-	regularization = 1e-6*0
+	regularization = 1e-6
 	#decision variables for robot 1
 	q1, q_dot1 = hqp.create_variable(7, regularization)
 	J1 = jac_fun_rob(q1)
@@ -151,10 +151,10 @@ if __name__ == '__main__':
 	s2_dot_rate_ff = 0.5
 	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
 
-	hqp.create_constraint(q_dot1, 'equality', priority = 5)
-	hqp.create_constraint(q_dot2, 'equality', priority = 5)
-	hqp.create_constraint(q_torso_dot, 'equality', priority = 5)
-	hqp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'equality', priority = 5)
+	# hqp.create_constraint(q_dot1, 'equality', priority = 5)
+	# hqp.create_constraint(q_dot2, 'equality', priority = 5)
+	# hqp.create_constraint(q_torso_dot, 'equality', priority = 5)
+	# hqp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'equality', priority = 5)
 
 	p_opts = {"expand":True}
 
@@ -220,7 +220,7 @@ if __name__ == '__main__':
 	no_times_exceeded = 0
 	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 0.1)
 	comp_time.append(hqp.time_taken)
-
+	time.sleep(15)
 	sequential_method = False
 	for i in range(math.ceil(T/ts)):
 		counter += 1

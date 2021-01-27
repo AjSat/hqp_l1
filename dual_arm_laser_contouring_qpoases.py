@@ -105,8 +105,8 @@ if __name__ == '__main__':
 	hqp.create_constraint(s_dot1 - s1_dot_rate_ff, 'equality', 3)
 
 	#slack priority 5
-	hqp.create_constraint(Jacdepth@x_dot + K_depth*a, 'equality', priority = 4)
-	hqp.create_constraint(-(Jacang@x_dot + dot_prod_ee_workpiece), 'equality', priority = 4)
+	# hqp.create_constraint(Jacdepth@x_dot + K_depth*a, 'equality', priority = 4)
+	# hqp.create_constraint(-(Jacang@x_dot + dot_prod_ee_workpiece), 'equality', priority = 4)
 
 	#slack priority 6
 	# hqp.create_constraint(q_dot1, 'eq', 5, {"b":cs.vcat([0]*14)})
@@ -136,10 +136,11 @@ if __name__ == '__main__':
 		obj.resetJointState(yumiID, joint_indices, q0)
 		joint_indices = [11, 12, 13, 14, 15, 16, 17, 1, 2, 3, 4, 5, 6, 7]
 
+	time.sleep(15)
 	cool_off_counter = 0
 	comp_time = []
 	simplex_iters = []
-	constraint_violations = cs.DM([0, 0, 0, 0])
+	constraint_violations = cs.DM([0, 0, 0])
 	max_err = 0;
 	no_times_exceeded = 0
 	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, cs.DM.zeros(15,1), gamma_init = 0.1, iter_lim = 0.1)
@@ -149,7 +150,7 @@ if __name__ == '__main__':
 	q_2_integral = 0
 	sequential_method = False
 	q_dot_opt = cs.DM.zeros(15,1)
-	for i in range(1000): #range(math.ceil(T/ts)):
+	for i in range(4000): #range(math.ceil(T/ts)):
 		counter += 1
 		# hqp.time_taken = 0
 		print("iter :" + str(i))
@@ -162,8 +163,8 @@ if __name__ == '__main__':
 			# q_dot1_sol = var_dot_sol[0:14]
 			# s_dot1_sol = var_dot_sol[14]
 
-			con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3], hqp.slacks[4]))
-			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3])), cs.norm_1(sol.value(hqp.slacks[4]))))
+			con_viols = sol.value(cs.vertcat(hqp.slacks[1], hqp.slacks[2], hqp.slacks[3]))
+			constraint_violations = cs.horzcat(constraint_violations, cs.vertcat(cs.norm_1(sol.value(hqp.slacks[1])), cs.norm_1(sol.value(hqp.slacks[2])), cs.norm_1(sol.value(hqp.slacks[3]))))
 			print(hqp.time_taken)
 			comp_time.append(hqp.time_taken)
 
@@ -215,16 +216,15 @@ if __name__ == '__main__':
 
 	enablePrint()
 
-	print("Total average number of actuators used = " + str(q_zero_integral/5))
-	print("Total average number of L2  = " + str(q_2_integral/5))
-	print("Total average number of L1 = " + str(q_1_integral/5))
+	print("Total average number of actuators used = " + str(q_zero_integral/20))
+	print("Total average number of L2  = " + str(q_2_integral/20))
+	print("Total average number of L1 = " + str(q_1_integral/20))
 
 	#Implementing solution by Hierarchical QP
 	figure()
 	plot(list(range(counter)), constraint_violations[0,:].full().T, label = '2nd priority')
 	plot(list(range(counter)), constraint_violations[1,:].full().T, label = '3rd priority')
 	plot(list(range(counter)), constraint_violations[2,:].full().T, label = '4th priority')
-	plot(list(range(counter)), constraint_violations[3,:].full().T, label = '5th priority')
 	title("Constraint violations")
 	xlabel("Time step (Control sampling time = 0.005s)")
 	legend()

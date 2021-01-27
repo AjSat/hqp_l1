@@ -28,7 +28,7 @@ def inv_T_matrix(T):
 
 if __name__ == '__main__':
 
-	max_joint_vel = 500*3.14159/180
+	max_joint_vel = 50*3.14159/180
 	max_joint_acc = 60*3.14159/180
 	rob_settings = {'n_dof' : 18, 'no_links' : 20, 'q_min' : np.array([-2.9409, -2.5045, -2.9409, -2.1555, -5.0615, -1.5359, -3.9968, -0.1, -0.1, -2.9409, -2.5045, -2.9409, -2.1555, -5.0615, -1.5359, -3.9968, -0.1, -0.1]).T, 'q_max' : np.array([2.9409, 0.7592, 2.9409, 1.3963, 5.0615, 2.4086, 3.9968, 0.025, 0.025, 2.9409, 0.7592, 2.9409, 1.3963, 5.0615, 2.4086, 3.9968, 0.025, 0.025]).T }
 	robot = rob.Robot('yumi')
@@ -100,11 +100,11 @@ if __name__ == '__main__':
 	hlp.create_constraint(s_dot1 - s1_dot_rate_ff, 'eq', 3, {'b':0.0})
 
 	#slack priority 5
-	hlp.create_constraint(Jacdepth@x_dot + K_depth*a, 'eq', priority = 4, options = {'b':0.02})
-	hlp.create_constraint(-(Jacang@x_dot + dot_prod_ee_workpiece), 'eq', priority = 4, options = {'b':-1})
+	# hlp.create_constraint(Jacdepth@x_dot + K_depth*a, 'eq', priority = 4, options = {'b':0.02})
+	# hlp.create_constraint(-(Jacang@x_dot + dot_prod_ee_workpiece), 'eq', priority = 4, options = {'b':-1})
 
 	#slack priority 6
-	hlp.create_constraint(q_dot1, 'eq', 5, {"b":cs.vcat([0]*14)})
+	hlp.create_constraint(q_dot1, 'eq', 4, {"b":cs.vcat([0]*14)})
 
 	q_opt = cs.vertcat(q0[0:7], q0[9:16], 0, cs.DM([0]*14))
 	q_opt_history = q_opt
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 		import world_simulator
 		import pybullet as p
 
-		obj = world_simulator.world_simulator(bullet_gui = False)
+		obj = world_simulator.world_simulator(bullet_gui = True)
 		position = [0.0, 0.0, 0.0]
 		orientation = [0.0, 0.0, 0.0, 1.0]
 
@@ -149,8 +149,9 @@ if __name__ == '__main__':
 	q_1_integral = 0
 	q_2_integral = 0
 	sequential_method = False
+	time.sleep(15)
 
-	for i in range(1000): #range(math.ceil(T/ts)):
+	for i in range(4000): #range(math.ceil(T/ts)):
 		counter += 1
 		# hqp.time_taken = 0
 		print("iter :" + str(i))
@@ -224,9 +225,9 @@ if __name__ == '__main__':
 	if visualizationBullet:
 		obj.end_simulation()
 
-	print("Total average number of actuators used = " + str(q_zero_integral/5))
-	print("Total average number of L2  = " + str(q_2_integral/5))
-	print("Total average number of L1 = " + str(q_1_integral/5))
+	print("Total average number of actuators used = " + str(q_zero_integral/20))
+	print("Total average number of L2  = " + str(q_2_integral/20))
+	print("Total average number of L1 = " + str(q_1_integral/20))
 
 	#Implementing solution by Hierarchical QP
 	figure()
