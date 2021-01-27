@@ -28,9 +28,9 @@ https://www.gurobi.com/downloads/gurobi-optimizer-eula/
 
 ## Weighted and sequential methods 
 
-The code for this part includes the following dependencies:
+The code is tested on Ubuntu 18.04LTS. The code for this part includes the following dependencies:
 
-* **Python3.6.9** or higher
+* **Python3.7** or higher
 
 * **CasADi** - A toolbox used for automatic differentiation of the task functions and as the interface to optimization solvers.
 
@@ -53,5 +53,10 @@ The weighted and sequential problems with L1 norm penalty are implemented in Pyt
 * solve_HQPl1() is the implementation of the weighted method.
 * solve_adaptive_hqp3() is the implementation of the adaptive method.
 
+### Run the examples requiring MOSEK
 
+A free academic license for MOSEK can be requested at:
+https://www.mosek.com/products/academic-licenses/
+
+lexopt_mosek.py includes all the functions for the WLP-L1 task specification using MOSEK Fusion API. Please refer to dual_arm_coupled_mosek.py to learn how to use this file.
 
