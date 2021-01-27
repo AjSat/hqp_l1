@@ -25,11 +25,12 @@ def enablePrint():
 
 if __name__ == '__main__':
 
-
+	#setting velocity and acceleration limits
 	max_joint_acc = 150*3.14159/180
 	max_joint_vel = 50*3.14159/180
 	gamma = 1.4
 
+	#creating the two robots
 	robot = rob.Robot('iiwa7')
 	robot.set_joint_acceleration_limits(lb = -max_joint_acc, ub = max_joint_acc)
 	robot.set_joint_velocity_limits(lb = -max_joint_vel, ub = max_joint_vel)
@@ -45,15 +46,22 @@ if __name__ == '__main__':
 
 	ts = 0.005
 	T = 1.000*5
-
+	#initial configurations
 	q0_1 = [-5.53636820e-01, 1.86726808e-01, -1.32319806e-01, -2.06761360e+00, 3.12421835e-02,  8.89043596e-01, -7.03329152e-01]
 	q0_2 = [ 0.36148756, 0.19562711, 0.34339407,-2.06759027, -0.08427634, 0.89133467, 0.75131025]
 
 	#Implementing with my L1 norm method
 
-	hqp = hqp()
+	hqp = hqp() #creating the instance of the task specification
 
-	regularization = 1e-6
+	WLP_l1 = True #implement wlp-l2
+	WLP_l2 = False #implement wlp-l1. If neither is true, implement cascaded QP
+
+	if WLP_l1:
+		regularization = 0
+	else:
+		regularization = 1e-6
+
 	#decision variables for robot 1
 	q1, q_dot1 = hqp.create_variable(7, regularization)
 	J1 = jac_fun_rob(q1)
@@ -151,10 +159,11 @@ if __name__ == '__main__':
 	s2_dot_rate_ff = 0.5
 	hqp.create_constraint(s_dot2 - s2_dot_rate_ff, 'equality', priority = 4)
 
-	# hqp.create_constraint(q_dot1, 'equality', priority = 5)
-	# hqp.create_constraint(q_dot2, 'equality', priority = 5)
-	# hqp.create_constraint(q_torso_dot, 'equality', priority = 5)
-	# hqp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'equality', priority = 5)
+	if WLP_l1:
+		hqp.create_constraint(q_dot1, 'equality', priority = 5)
+		hqp.create_constraint(q_dot2, 'equality', priority = 5)
+		hqp.create_constraint(q_torso_dot, 'equality', priority = 5)
+		hqp.create_constraint(cs.vertcat(s_dot1, s_dot2), 'equality', priority = 5)
 
 	p_opts = {"expand":True}
 
@@ -220,8 +229,9 @@ if __name__ == '__main__':
 	no_times_exceeded = 0
 	sol, hierarchy_failure = hqp.solve_adaptive_hqp3(q_opt, q_dot_opt, gamma_init = 0.1, iter_lim = 0.1)
 	comp_time.append(hqp.time_taken)
-	time.sleep(15)
-	sequential_method = False
+	sequential_method = False #the warmstarted version is not as stable as WLP,
+	# please use max accelerations around 60. Or select the more robust solve_cascadedQP5()
+	# in line number 262. Very slow because also builds the problem at each iteration.
 	for i in range(math.ceil(T/ts)):
 		counter += 1
 		hqp.time_taken = 0
@@ -247,14 +257,22 @@ if __name__ == '__main__':
 		if sequential_method:
 			q_dot_opt = q_dot_opt.full()
 			q_opt = q_opt.full()
-			# # sol_cqp, chqp_optis = hqp.solve_cascadedQP3(q_opt, q_dot_opt)
-			# sol_cqp = hqp.solve_cascadedQP4(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
-			sol_cqp = hqp.solve_cascadedQP_L2_warmstart(q_opt, q_dot_opt, warm_start = True)
+			# #
+			if WLP_l1 or WLP_l2:
+				# sol_cqp = hqp.solve_cascadedQP5(q_opt, q_dot_opt)
+				sol_cqp = hqp.solve_cascadedQP4(q_opt, q_dot_opt, warm_start = True)#, solver = 'ipopt')
+			else:
+				sol_cqp = hqp.solve_cascadedQP_L2_warmstart(q_opt, q_dot_opt, warm_start = True)
 			# # # sol_h = hqp.solve_HQPl1(q_opt, q_dot_opt, gamma_init = 10.0)
-			sol = sol_cqp[4]
+			if not WLP_l1:
+				sol = sol_cqp[4]
+				var_dot_sol = sol.value(hqp.cHQP_xdot[4])
+			else:
+				sol = sol_cqp[5]
+				var_dot_sol = sol.value(hqp.cHQP_xdot[5])
 			# # # print(var_dot.shape)
 			# # # var_dot = chqp_optis[4][3]
-			var_dot_sol = sol.value(hqp.cHQP_xdot[4])
+
 			enablePrint()
 			print(hqp.time_taken)
 			comp_time.append(hqp.time_taken)
