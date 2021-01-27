@@ -30,24 +30,28 @@ https://www.gurobi.com/downloads/gurobi-optimizer-eula/
 
 The code for this part includes the following dependencies:
 
-* **Python3.5** or above
+* **Python3.6.9** or higher
 
-* **CasADi** - A toolbox used for automatic differentiation of the task functions and as the interface to optimization solvers. Can be installed by
+* **CasADi** - A toolbox used for automatic differentiation of the task functions and as the interface to optimization solvers.
+
+* **PyBullet** - If one chooses to simulate and visualize the robot motion. 
+
+We recommend to install the dependencies in a virtual environment by following the instructions below
 ```
+python3 -m venv env_ral_check
+source env_ral_check/bin/activate
 pip3 install casadi
-```
-* **PyBullet** - If one chooses to simulate and visualize the robot motion. Can be installed by:
-
-```
 pip3 install pybullet
 ```
+Please run dual_arm_task_coupled.py to run the example from Section V.D
 
 
 The weighted and sequential problems with L1 norm penalty are implemented in Python using Casadi in the **hqp.py** file. Within this file:
 
-* hqp.solve_cascadedQP4() - Is the implementation of the sequential method.
+* hqp.solve_cascadedQP4() - Is the implementation of the sequential method (warmstarted).
+* hqp.solve_cascadedQP5() - Is the implementation of the sequential method (non-warmstarted). Stabler implementation but slow.
 * solve_HQPl1() is the implementation of the weighted method.
-* solve_adaptive_hqp3() is a newly implemented adaptive method whose verification of lexicographic optimality is exact because simply the corresponding sequential method is used for verification.
+* solve_adaptive_hqp3() is the implementation of the adaptive method.
 
 
 
