@@ -2,7 +2,7 @@
 
 ### Using L1 norm as a regularization step can allow for sparse or parsimonious control of the robot system.
 ### Specifying constraint violations using L1 norm leads to sparse constraint violations
-## instructions on running the code to reproduce results coming by Jan 26.
+## instructions on running the code to reproduce results coming by Jan 27th PST.
 
 This repository contains the source code for a paper submitted to IEEE RA-L/ICRA and is currently under review.
 Documentation coming soon to improve readability of the code.
